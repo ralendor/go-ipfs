@@ -55,7 +55,11 @@ Follows an IPNS name by periodically resolving in the backround.
 			return cmdkit.Errorf(cmdkit.ErrClient, "IPNS Namecache is not available")
 		}
 
+<<<<<<< HEAD
 		prefetch, _ := req.Options["prefetch"].(bool)
+=======
+		pin, _ := req.Options["pin"].(bool)
+>>>>>>> namecache: update name follow to new cmd lib
 		refrS, _ := req.Options["refresh-interval"].(string)
 		refr := nc.DefaultFollowInterval
 
@@ -67,7 +71,11 @@ Follows an IPNS name by periodically resolving in the backround.
 		}
 
 		for _, name := range req.Arguments {
+<<<<<<< HEAD
 			err = n.Namecache.Follow(name, prefetch, refr)
+=======
+			err = n.Namecache.Follow(name, pin, refr)
+>>>>>>> namecache: update name follow to new cmd lib
 			if err != nil {
 				return err
 			}
