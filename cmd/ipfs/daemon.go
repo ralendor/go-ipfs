@@ -24,6 +24,7 @@ import (
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
 	migrate "github.com/ipfs/go-ipfs/repo/fsrepo/migrations"
 
+<<<<<<< HEAD
 	ma "gx/ipfs/QmNTCey11oxhb1AxDnQBRHtdhap6Ctud872NjAYPYYXPuc/go-multiaddr"
 	cmds "gx/ipfs/QmR77mMvvh8mJBBWQmBfQBu8oD38NUN4KE9SL2gDgAQNc6/go-ipfs-cmds"
 	goprocess "gx/ipfs/QmSF8fPo3jgVBAy8fpdjjYqgG87dkJgUprRBHRd2tmfgpP/goprocess"
@@ -31,6 +32,15 @@ import (
 	mprome "gx/ipfs/QmVMcMs6duiwLzvhF6xWM3yc4GgjpNoctKFhvtBch5tpgo/go-metrics-prometheus"
 	"gx/ipfs/QmZcLBXKaFe8ND5YHPkJRAwmhJGrVsi1JqDZNyJ4nRK5Mj/go-multiaddr-net"
 	"gx/ipfs/Qmde5VP1qUkyQXKCfmEUA7bP64V2HAptbJ7phuPp7jXWwg/go-ipfs-cmdkit"
+=======
+	"github.com/hashicorp/go-multierror"
+	cmds "github.com/ipfs/go-ipfs-cmds"
+	mprome "github.com/ipfs/go-metrics-prometheus"
+	goprocess "github.com/jbenet/goprocess"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/prometheus/client_golang/prometheus"
+>>>>>>> feat: add ability to use existing config during init
 )
 
 const (
@@ -55,7 +65,6 @@ const (
 	enablePubSubKwd           = "enable-pubsub-experiment"
 	enableIPNSPubSubKwd       = "enable-namesys-pubsub"
 	enableMultiplexKwd        = "enable-mplex-experiment"
-	enableFollowKwd           = "enable-follow-experiment"
 	// apiAddrKwd    = "address-api"
 	// swarmAddrKwd  = "address-swarm"
 )
@@ -152,6 +161,7 @@ Headers.
 `,
 	},
 
+<<<<<<< HEAD
 	Options: []cmdkit.Option{
 		cmdkit.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
 		cmdkit.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
@@ -169,6 +179,25 @@ Headers.
 		cmdkit.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
 		cmdkit.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
 		cmdkit.BoolOption(enableFollowKwd, "Enable IPNS name following."),
+=======
+	Options: []cmds.Option{
+		cmds.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
+		cmds.StringOption(initConfigOptionKwd, "Path to existing configuration file to be loaded during --init"),
+		cmds.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
+		cmds.StringOption(routingOptionKwd, "Overrides the routing option").WithDefault(routingOptionDefaultKwd),
+		cmds.BoolOption(mountKwd, "Mounts IPFS to the filesystem"),
+		cmds.BoolOption(writableKwd, "Enable writing objects (with POST, PUT and DELETE)"),
+		cmds.StringOption(ipfsMountKwd, "Path to the mountpoint for IPFS (if using --mount). Defaults to config setting."),
+		cmds.StringOption(ipnsMountKwd, "Path to the mountpoint for IPNS (if using --mount). Defaults to config setting."),
+		cmds.BoolOption(unrestrictedApiAccessKwd, "Allow API access to unlisted hashes"),
+		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
+		cmds.BoolOption(enableGCKwd, "Enable automatic periodic repo garbage collection"),
+		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
+		cmds.BoolOption(migrateKwd, "If true, assume yes at the migrate prompt. If false, assume no."),
+		cmds.BoolOption(enablePubSubKwd, "Instantiate the ipfs daemon with the experimental pubsub feature enabled."),
+		cmds.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
+		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
+>>>>>>> feat: add ability to use existing config during init
 
 		// TODO: add way to override addresses. tricky part: updating the config if also --init.
 		// cmdkit.StringOption(apiAddrKwd, "Address for the daemon rpc API (overrides config)"),
@@ -285,11 +314,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
+	cfg, err := cctx.GetConfig()
+	if err != nil {
+		return err
+	}
+
 	offline, _ := req.Options[offlineKwd].(bool)
 	ipnsps, _ := req.Options[enableIPNSPubSubKwd].(bool)
 	pubsub, _ := req.Options[enablePubSubKwd].(bool)
 	mplex, _ := req.Options[enableMultiplexKwd].(bool)
-	follow, _ := req.Options[enableFollowKwd].(bool)
 
 	// Start assembling node config
 	ncfg := &core.BuildCfg{
@@ -301,7 +334,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			"pubsub": pubsub,
 			"ipnsps": ipnsps,
 			"mplex":  mplex,
-			"follow": follow,
 		},
 		//TODO(Kubuxu): refactor Online vs Offline by adding Permanent vs Ephemeral
 	}
@@ -324,7 +356,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case routingOptionDHTClientKwd:
 		ncfg.Routing = core.DHTClientOption
 	case routingOptionDHTKwd:
+<<<<<<< HEAD
 		ncfg.Routing = core.DHTOption
+=======
+		ncfg.Routing = libp2p.DHTOption
+>>>>>>> feat: add ability to use existing config during init
 	case routingOptionNoneKwd:
 		ncfg.Routing = core.NilRouterOption
 	default:
@@ -421,6 +457,10 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	// collect long-running errors and block for shutdown
 	// TODO(cryptix): our fuse currently doesnt follow this pattern for graceful shutdown
+<<<<<<< HEAD
+=======
+	var errs error
+>>>>>>> feat: add ability to use existing config during init
 	for err := range merge(apiErrc, gwErrc, gcErrc) {
 		if err != nil {
 			return err
