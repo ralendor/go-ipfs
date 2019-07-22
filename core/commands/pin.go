@@ -2,11 +2,15 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"time"
+
+	core "github.com/ipfs/go-ipfs/core"
+	cmdenv "github.com/ipfs/go-ipfs/core/commands/cmdenv"
+	e "github.com/ipfs/go-ipfs/core/commands/e"
+	pin "github.com/ipfs/go-ipfs/pin"
 
 	bserv "github.com/ipfs/go-blockservice"
 	cid "github.com/ipfs/go-cid"
@@ -18,10 +22,6 @@ import (
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	options "github.com/ipfs/interface-go-ipfs-core/options"
 	"github.com/ipfs/interface-go-ipfs-core/path"
-
-	core "github.com/ipfs/go-ipfs/core"
-	cmdenv "github.com/ipfs/go-ipfs/core/commands/cmdenv"
-	e "github.com/ipfs/go-ipfs/core/commands/e"
 )
 
 var PinCmd = &cmds.Command{
@@ -317,6 +317,11 @@ Example:
 		cmds.BoolOption(pinStreamOptionName, "s", "Enable streaming of pins as they are discovered."),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		n, err := cmdenv.GetNode(env)
+		if err != nil {
+			return err
+		}
+
 		api, err := cmdenv.GetApi(env, req)
 		if err != nil {
 			return err
@@ -344,9 +349,9 @@ Example:
 		}
 
 		if len(req.Arguments) > 0 {
-			err = pinLsKeys(req, typeStr, api, emit)
+			err = pinLsKeys(req, typeStr, n, api, emit)
 		} else {
-			err = pinLsAll(req, typeStr, api, emit)
+			err = pinLsAll(req, typeStr, n, emit)
 		}
 		if err != nil {
 			return err
@@ -362,17 +367,6 @@ Example:
 	},
 	Type: &PinLsOutputWrapper{},
 	Encoders: cmds.EncoderMap{
-		cmds.JSON: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *PinLsOutputWrapper) error {
-			stream, _ := req.Options[pinStreamOptionName].(bool)
-
-			enc := json.NewEncoder(w)
-
-			if stream {
-				return enc.Encode(out.PinLsObject)
-			}
-
-			return enc.Encode(out.PinLsList)
-		}),
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *PinLsOutputWrapper) error {
 			quiet, _ := req.Options[pinQuietOptionName].(bool)
 			stream, _ := req.Options[pinStreamOptionName].(bool)
@@ -409,7 +403,7 @@ type PinLsOutputWrapper struct {
 
 // PinLsList is a set of pins with their type
 type PinLsList struct {
-	Keys map[string]PinLsType
+	Keys map[string]PinLsType `json:",omitempty"`
 }
 
 // PinLsType contains the type of a pin
@@ -423,30 +417,24 @@ type PinLsObject struct {
 	Type string `json:",omitempty"`
 }
 
-func pinLsKeys(req *cmds.Request, typeStr string, api coreiface.CoreAPI, emit func(value interface{}) error) error {
+func pinLsKeys(req *cmds.Request, typeStr string, n *core.IpfsNode, api coreiface.CoreAPI, emit func(value interface{}) error) error {
+	mode, ok := pin.StringToMode(typeStr)
+	if !ok {
+		return fmt.Errorf("invalid pin mode '%s'", typeStr)
+	}
+
 	enc, err := cmdenv.GetCidEncoder(req)
 	if err != nil {
 		return err
 	}
 
-	switch typeStr {
-	case "all", "direct", "indirect", "recursive":
-	default:
-		return fmt.Errorf("invalid type '%s', must be one of {direct, indirect, recursive, all}", typeStr)
-	}
-
-	opt, err := options.Pin.IsPinned.Type(typeStr)
-	if err != nil {
-		panic("unhandled pin type")
-	}
-
 	for _, p := range req.Arguments {
-		rp, err := api.ResolvePath(req.Context, path.New(p))
+		c, err := api.ResolvePath(req.Context, path.New(p))
 		if err != nil {
 			return err
 		}
 
-		pinType, pinned, err := api.Pin().IsPinned(req.Context, rp, opt)
+		pinType, pinned, err := n.Pinning.IsPinnedWithType(c.Cid(), mode)
 		if err != nil {
 			return err
 		}
@@ -464,7 +452,7 @@ func pinLsKeys(req *cmds.Request, typeStr string, api coreiface.CoreAPI, emit fu
 		err = emit(&PinLsOutputWrapper{
 			PinLsObject: PinLsObject{
 				Type: pinType,
-				Cid:  enc.Encode(rp.Cid()),
+				Cid:  enc.Encode(c.Cid()),
 			},
 		})
 		if err != nil {
@@ -475,38 +463,72 @@ func pinLsKeys(req *cmds.Request, typeStr string, api coreiface.CoreAPI, emit fu
 	return nil
 }
 
-func pinLsAll(req *cmds.Request, typeStr string, api coreiface.CoreAPI, emit func(value interface{}) error) error {
+func pinLsAll(req *cmds.Request, typeStr string, n *core.IpfsNode, emit func(value interface{}) error) error {
 	enc, err := cmdenv.GetCidEncoder(req)
 	if err != nil {
 		return err
 	}
 
-	switch typeStr {
-	case "all", "direct", "indirect", "recursive":
-	default:
-		err = fmt.Errorf("invalid type '%s', must be one of {direct, indirect, recursive, all}", typeStr)
-		return err
+	keys := cid.NewSet()
+
+	AddToResultKeys := func(keyList []cid.Cid, typeStr string) error {
+		for _, c := range keyList {
+			if keys.Visit(c) {
+				err := emit(&PinLsOutputWrapper{
+					PinLsObject: PinLsObject{
+						Type: typeStr,
+						Cid:  enc.Encode(c),
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	}
 
-	opt, err := options.Pin.Ls.Type(typeStr)
-	if err != nil {
-		panic("unhandled pin type")
-	}
-
-	pins, err := api.Pin().Ls(req.Context, opt)
-	if err != nil {
-		return err
-	}
-
-	for p := range pins {
-		err = emit(&PinLsOutputWrapper{
-			PinLsObject: PinLsObject{
-				Type: p.Type(),
-				Cid:  enc.Encode(p.Path().Cid()),
-			},
-		})
+	if typeStr == "direct" || typeStr == "all" {
+		err := AddToResultKeys(n.Pinning.DirectKeys(), "direct")
 		if err != nil {
 			return err
+		}
+	}
+	if typeStr == "recursive" || typeStr == "all" {
+		err := AddToResultKeys(n.Pinning.RecursiveKeys(), "recursive")
+		if err != nil {
+			return err
+		}
+	}
+	if typeStr == "indirect" || typeStr == "all" {
+		for _, k := range n.Pinning.RecursiveKeys() {
+			var visitErr error
+			err := dag.WalkParallelDepth(req.Context, dag.GetLinksWithDAG(n.DAG), k, 0, func(c cid.Cid, depth int) bool {
+				if depth == 0 {
+					// skip it without visiting it.
+					return true
+				}
+				r := keys.Visit(c)
+				if r {
+					err := emit(&PinLsOutputWrapper{
+						PinLsObject: PinLsObject{
+							Type: "indirect",
+							Cid:  enc.Encode(c),
+						},
+					})
+					if err != nil {
+						visitErr = err
+					}
+				}
+				return r
+			})
+
+			if visitErr != nil {
+				return visitErr
+			}
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -524,8 +546,8 @@ var updatePinCmd = &cmds.Command{
 Efficiently pins a new object based on differences from an existing one and,
 by default, removes the old pin.
 
-This command is useful when the new pin contains many similarities or is a
-derivative of an existing one, particularly for large objects. This allows a more
+This commands is useful when the new pin contains many similarities or is a
+derivate of an existing one, particuarly for large objects. This allows a more
 efficient DAG-traversal which fully skips already-pinned branches from the old
 object. As a requirement, the old object needs to be an existing recursive
 pin.
@@ -612,10 +634,8 @@ var verifyPinCmd = &cmds.Command{
 			explain:   !quiet,
 			includeOk: verbose,
 		}
-		out, err := pinVerify(req.Context, n, opts, enc)
-		if err != nil {
-			return err
-		}
+		out := pinVerify(req.Context, n, opts, enc)
+
 		return res.Emit(out)
 	},
 	Type: PinVerifyRes{},
@@ -657,16 +677,13 @@ type pinVerifyOpts struct {
 	includeOk bool
 }
 
-func pinVerify(ctx context.Context, n *core.IpfsNode, opts pinVerifyOpts, enc cidenc.Encoder) (<-chan interface{}, error) {
+func pinVerify(ctx context.Context, n *core.IpfsNode, opts pinVerifyOpts, enc cidenc.Encoder) <-chan interface{} {
 	visited := make(map[cid.Cid]PinStatus)
 
 	bs := n.Blocks.Blockstore()
 	DAG := dag.NewDAGService(bserv.New(bs, offline.Exchange(bs)))
 	getLinks := dag.GetLinksWithDAG(DAG)
-	recPins, err := n.Pinning.RecursiveKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
+	recPins := n.Pinning.RecursiveKeys()
 
 	var checkPin func(root cid.Cid) PinStatus
 	checkPin = func(root cid.Cid) PinStatus {
@@ -722,7 +739,7 @@ func pinVerify(ctx context.Context, n *core.IpfsNode, opts pinVerifyOpts, enc ci
 		}
 	}()
 
-	return out, nil
+	return out
 }
 
 // Format formats PinVerifyRes
