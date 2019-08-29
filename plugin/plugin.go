@@ -5,6 +5,7 @@ type Environment struct {
 	// Path to the IPFS repo.
 	Repo string
 
+<<<<<<< HEAD
 	// The plugin's config, if specified in the
 	// Plugins.Plugins["plugin-name"].Config field of the user's go-ipfs
 	// config. See docs/plugins.md for details.
@@ -15,6 +16,13 @@ type Environment struct {
 }
 
 // Plugin is the base interface for all kinds of go-ipfs plugins
+=======
+	// The plugin's config, if specified.
+	Config interface{}
+}
+
+// Plugin is base interface for all kinds of go-ipfs plugins
+>>>>>>> plugins: add support for plugin configs
 // It will be included in interfaces of different Plugins
 //
 // Optionally, Plugins can implement io.Closer if they want to

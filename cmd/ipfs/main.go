@@ -271,6 +271,7 @@ func makeExecutor(req *cmds.Request, env interface{}) (cmds.Executor, error) {
 	// Fallback on a local executor if we (a) have a repo and (b) aren't
 	// forcing a daemon.
 	if !daemonRequested && fsrepo.IsInitialized(cctx.ConfigRoot) {
+<<<<<<< HEAD
 		opts = append(opts, cmdhttp.ClientWithFallback(exe))
 	}
 
@@ -291,6 +292,12 @@ func makeExecutor(req *cmds.Request, env interface{}) (cmds.Executor, error) {
 	}
 
 	return cmdhttp.NewClient(host, opts...), nil
+=======
+		opts = append(opts, http.ClientWithFallback(exe))
+	}
+
+	return http.NewClient(host, opts...), nil
+>>>>>>> plugins: add support for plugin configs
 }
 
 // commandDetails returns a command's details for the command given by |path|.
