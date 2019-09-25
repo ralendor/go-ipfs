@@ -4,7 +4,11 @@ package main
 
 import (
 <<<<<<< HEAD
+<<<<<<< HEAD
 	daemon "github.com/coreos/go-systemd/v22/daemon"
+=======
+	daemon "github.com/coreos/go-systemd/daemon"
+>>>>>>> systemd: add notify support
 =======
 	daemon "github.com/coreos/go-systemd/daemon"
 >>>>>>> systemd: add notify support
