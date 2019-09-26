@@ -22,10 +22,10 @@ import (
 	repo "github.com/ipfs/go-ipfs/repo"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
 
-	cmds "github.com/ipfs/go-ipfs-cmds"
+	"github.com/ipfs/go-ipfs-cmds"
 	"github.com/ipfs/go-ipfs-cmds/cli"
 	cmdhttp "github.com/ipfs/go-ipfs-cmds/http"
-	config "github.com/ipfs/go-ipfs-config"
+	"github.com/ipfs/go-ipfs-config"
 	u "github.com/ipfs/go-ipfs-util"
 	logging "github.com/ipfs/go-log"
 	loggables "github.com/libp2p/go-libp2p-loggables"
@@ -113,9 +113,6 @@ func mainRet() int {
 				os.Args[1] = "--help"
 			}
 		}
-	} else if insideGUI() { // if no args were passed, and we're in a GUI environment
-		// launch the daemon instead of launching a ghost window
-		os.Args = append(os.Args, "daemon", "--init")
 	}
 
 	// output depends on executable name passed in os.Args
@@ -173,10 +170,6 @@ func mainRet() int {
 
 	// everything went better than expected :)
 	return 0
-}
-
-func insideGUI() bool {
-	return util.InsideGUI()
 }
 
 func checkDebug(req *cmds.Request) {
@@ -271,7 +264,6 @@ func makeExecutor(req *cmds.Request, env interface{}) (cmds.Executor, error) {
 	// Fallback on a local executor if we (a) have a repo and (b) aren't
 	// forcing a daemon.
 	if !daemonRequested && fsrepo.IsInitialized(cctx.ConfigRoot) {
-<<<<<<< HEAD
 		opts = append(opts, cmdhttp.ClientWithFallback(exe))
 	}
 
@@ -292,12 +284,6 @@ func makeExecutor(req *cmds.Request, env interface{}) (cmds.Executor, error) {
 	}
 
 	return cmdhttp.NewClient(host, opts...), nil
-=======
-		opts = append(opts, http.ClientWithFallback(exe))
-	}
-
-	return http.NewClient(host, opts...), nil
->>>>>>> plugins: add support for plugin configs
 }
 
 // commandDetails returns a command's details for the command given by |path|.
