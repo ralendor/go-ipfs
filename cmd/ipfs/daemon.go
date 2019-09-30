@@ -13,6 +13,8 @@ import (
 	"sync"
 
 	version "github.com/ipfs/go-ipfs"
+	config "github.com/ipfs/go-ipfs-config"
+	cserial "github.com/ipfs/go-ipfs-config/serialize"
 	utilmain "github.com/ipfs/go-ipfs/cmd/ipfs/util"
 	oldcmds "github.com/ipfs/go-ipfs/commands"
 	"github.com/ipfs/go-ipfs/core"
@@ -20,33 +22,26 @@ import (
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
+	libp2p "github.com/ipfs/go-ipfs/core/node/libp2p"
 	nodeMount "github.com/ipfs/go-ipfs/fuse/node"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
 	migrate "github.com/ipfs/go-ipfs/repo/fsrepo/migrations"
 
-<<<<<<< HEAD
-	ma "gx/ipfs/QmNTCey11oxhb1AxDnQBRHtdhap6Ctud872NjAYPYYXPuc/go-multiaddr"
-	cmds "gx/ipfs/QmR77mMvvh8mJBBWQmBfQBu8oD38NUN4KE9SL2gDgAQNc6/go-ipfs-cmds"
-	goprocess "gx/ipfs/QmSF8fPo3jgVBAy8fpdjjYqgG87dkJgUprRBHRd2tmfgpP/goprocess"
-	"gx/ipfs/QmTQuFQWHAWy4wMH6ZyPfGiawA5u9T8rs79FENoV8yXaoS/client_golang/prometheus"
-	mprome "gx/ipfs/QmVMcMs6duiwLzvhF6xWM3yc4GgjpNoctKFhvtBch5tpgo/go-metrics-prometheus"
-	"gx/ipfs/QmZcLBXKaFe8ND5YHPkJRAwmhJGrVsi1JqDZNyJ4nRK5Mj/go-multiaddr-net"
-	"gx/ipfs/Qmde5VP1qUkyQXKCfmEUA7bP64V2HAptbJ7phuPp7jXWwg/go-ipfs-cmdkit"
-=======
 	"github.com/hashicorp/go-multierror"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	goprocess "github.com/jbenet/goprocess"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
-	"github.com/prometheus/client_golang/prometheus"
->>>>>>> feat: add ability to use existing config during init
+	prometheus "github.com/prometheus/client_golang/prometheus"
+	promauto "github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
 	adjustFDLimitKwd          = "manage-fdlimit"
 	enableGCKwd               = "enable-gc"
 	initOptionKwd             = "init"
+	initConfigOptionKwd       = "init-config"
 	initProfileOptionKwd      = "init-profile"
 	ipfsMountKwd              = "mount-ipfs"
 	ipnsMountKwd              = "mount-ipns"
@@ -70,7 +65,7 @@ const (
 )
 
 var daemonCmd = &cmds.Command{
-	Helptext: cmdkit.HelpText{
+	Helptext: cmds.HelpText{
 		Tagline: "Run a network-connected IPFS node.",
 		ShortDescription: `
 'ipfs daemon' runs a persistent ipfs daemon that can serve commands
@@ -108,8 +103,8 @@ ipfs supports passing arbitrary headers to the API and Gateway. You can
 do this by setting headers on the API.HTTPHeaders and Gateway.HTTPHeaders
 keys:
 
-  ipfs config --json API.HTTPHeaders.X-Special-Header '["so special :)"]'
-  ipfs config --json Gateway.HTTPHeaders.X-Special-Header '["so special :)"]'
+  ipfs config --json API.HTTPHeaders.X-Special-Header "[\"so special :)\"]"
+  ipfs config --json Gateway.HTTPHeaders.X-Special-Header "[\"so special :)\"]"
 
 Note that the value of the keys is an _array_ of strings. This is because
 headers can have more than one value, and it is convenient to pass through
@@ -119,9 +114,9 @@ CORS Headers (for API)
 
 You can setup CORS headers the same way:
 
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["example.com"]'
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin "[\"example.com\"]"
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods "[\"PUT\", \"GET\", \"POST\"]"
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials "[\"true\"]"
 
 Shutdown
 
@@ -161,25 +156,6 @@ Headers.
 `,
 	},
 
-<<<<<<< HEAD
-	Options: []cmdkit.Option{
-		cmdkit.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
-		cmdkit.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
-		cmdkit.StringOption(routingOptionKwd, "Overrides the routing option").WithDefault(routingOptionDefaultKwd),
-		cmdkit.BoolOption(mountKwd, "Mounts IPFS to the filesystem"),
-		cmdkit.BoolOption(writableKwd, "Enable writing objects (with POST, PUT and DELETE)"),
-		cmdkit.StringOption(ipfsMountKwd, "Path to the mountpoint for IPFS (if using --mount). Defaults to config setting."),
-		cmdkit.StringOption(ipnsMountKwd, "Path to the mountpoint for IPNS (if using --mount). Defaults to config setting."),
-		cmdkit.BoolOption(unrestrictedApiAccessKwd, "Allow API access to unlisted hashes"),
-		cmdkit.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
-		cmdkit.BoolOption(enableGCKwd, "Enable automatic periodic repo garbage collection"),
-		cmdkit.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
-		cmdkit.BoolOption(migrateKwd, "If true, assume yes at the migrate prompt. If false, assume no."),
-		cmdkit.BoolOption(enablePubSubKwd, "Instantiate the ipfs daemon with the experimental pubsub feature enabled."),
-		cmdkit.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
-		cmdkit.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
-		cmdkit.BoolOption(enableFollowKwd, "Enable IPNS name following."),
-=======
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
 		cmds.StringOption(initConfigOptionKwd, "Path to existing configuration file to be loaded during --init"),
@@ -197,11 +173,10 @@ Headers.
 		cmds.BoolOption(enablePubSubKwd, "Instantiate the ipfs daemon with the experimental pubsub feature enabled."),
 		cmds.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
 		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
->>>>>>> feat: add ability to use existing config during init
 
 		// TODO: add way to override addresses. tricky part: updating the config if also --init.
-		// cmdkit.StringOption(apiAddrKwd, "Address for the daemon rpc API (overrides config)"),
-		// cmdkit.StringOption(swarmAddrKwd, "Address for the swarm socket (overrides config)"),
+		// cmds.StringOption(apiAddrKwd, "Address for the daemon rpc API (overrides config)"),
+		// cmds.StringOption(swarmAddrKwd, "Address for the swarm socket (overrides config)"),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -259,16 +234,19 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// first, whether user has provided the initialization flag. we may be
 	// running in an uninitialized state.
 	initialize, _ := req.Options[initOptionKwd].(bool)
-	if initialize {
+	if initialize && !fsrepo.IsInitialized(cctx.ConfigRoot) {
+		cfgLocation, _ := req.Options[initConfigOptionKwd].(string)
+		profiles, _ := req.Options[initProfileOptionKwd].(string)
+		var conf *config.Config
 
-		cfg := cctx.ConfigRoot
-		if !fsrepo.IsInitialized(cfg) {
-			profiles, _ := req.Options[initProfileOptionKwd].(string)
-
-			err := initWithDefaults(os.Stdout, cfg, profiles)
-			if err != nil {
+		if cfgLocation != "" {
+			if conf, err = cserial.Load(cfgLocation); err != nil {
 				return err
 			}
+		}
+
+		if err = doInit(os.Stdout, cctx.ConfigRoot, false, nBitsForKeypairDefault, profiles, conf); err != nil {
+			return err
 		}
 	}
 
@@ -309,10 +287,9 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		break
 	}
 
-	cfg, err := cctx.GetConfig()
-	if err != nil {
-		return err
-	}
+	// The node will also close the repo but there are many places we could
+	// fail before we get to that. It can't hurt to close it twice.
+	defer repo.Close()
 
 	cfg, err := cctx.GetConfig()
 	if err != nil {
@@ -354,15 +331,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case routingOptionSupernodeKwd:
 		return errors.New("supernode routing was never fully implemented and has been removed")
 	case routingOptionDHTClientKwd:
-		ncfg.Routing = core.DHTClientOption
+		ncfg.Routing = libp2p.DHTClientOption
 	case routingOptionDHTKwd:
-<<<<<<< HEAD
-		ncfg.Routing = core.DHTOption
-=======
 		ncfg.Routing = libp2p.DHTOption
->>>>>>> feat: add ability to use existing config during init
 	case routingOptionNoneKwd:
-		ncfg.Routing = core.NilRouterOption
+		ncfg.Routing = libp2p.NilRouterOption
 	default:
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
@@ -372,7 +345,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		log.Error("error from node construction: ", err)
 		return err
 	}
-	node.SetLocal(false)
+	node.IsDaemon = true
 
 	if node.PNetFingerprint != nil {
 		fmt.Println("Swarm is limited to private network of peers with the swarm key")
@@ -407,7 +380,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	if err != nil {
 		return err
 	}
-	node.Process().AddChild(goprocess.WithTeardown(cctx.Plugins.Close))
+	node.Process.AddChild(goprocess.WithTeardown(cctx.Plugins.Close))
 
 	// construct api endpoint - every time
 	apiErrc, err := serveHTTPApi(req, cctx)
@@ -418,7 +391,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// construct fuse mountpoints - if the user provided the --mount flag
 	mount, _ := req.Options[mountKwd].(bool)
 	if mount && offline {
-		return cmdkit.Errorf(cmdkit.ErrClient, "mount is not currently supported in offline mode")
+		return cmds.Errorf(cmds.ErrClient, "mount is not currently supported in offline mode")
 	}
 	if mount {
 		if err := mountFuse(req, cctx); err != nil {
@@ -442,6 +415,18 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		}
 	}
 
+	// Add ipfs version info to prometheous metrics
+	var ipfsInfoMetric = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ipfs_info",
+		Help: "IPFS version information.",
+	}, []string{"version", "commit"})
+
+	// Setting to 1 lets us multiply it with other stats to add the version labels
+	ipfsInfoMetric.With(prometheus.Labels{
+		"version": version.CurrentVersionNumber,
+		"commit": version.CurrentCommit,
+	}).Set(1)
+
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.IpfsNodeCollector{Node: node})
 
@@ -457,17 +442,14 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	// collect long-running errors and block for shutdown
 	// TODO(cryptix): our fuse currently doesnt follow this pattern for graceful shutdown
-<<<<<<< HEAD
-=======
 	var errs error
->>>>>>> feat: add ability to use existing config during init
 	for err := range merge(apiErrc, gwErrc, gcErrc) {
 		if err != nil {
-			return err
+			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // serveHTTPApi collects options, creates listener, prints status message and starts serving requests
@@ -561,7 +543,7 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 
 // printSwarmAddrs prints the addresses of the host
 func printSwarmAddrs(node *core.IpfsNode) {
-	if !node.OnlineMode() {
+	if !node.IsOnline {
 		fmt.Println("Swarm not listening, running in offline mode.")
 		return
 	}
@@ -574,7 +556,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	for _, addr := range ifaceAddrs {
 		lisAddrs = append(lisAddrs, addr.String())
 	}
-	sort.Sort(sort.StringSlice(lisAddrs))
+	sort.Strings(lisAddrs)
 	for _, addr := range lisAddrs {
 		fmt.Printf("Swarm listening on %s\n", addr)
 	}
@@ -583,7 +565,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	for _, addr := range node.PeerHost.Addrs() {
 		addrs = append(addrs, addr.String())
 	}
-	sort.Sort(sort.StringSlice(addrs))
+	sort.Strings(addrs)
 	for _, addr := range addrs {
 		fmt.Printf("Swarm announcing %s\n", addr)
 	}
@@ -764,7 +746,11 @@ func YesNoPrompt(prompt string) bool {
 }
 
 func printVersion() {
-	fmt.Printf("go-ipfs version: %s-%s\n", version.CurrentVersionNumber, version.CurrentCommit)
+	v := version.CurrentVersionNumber
+	if version.CurrentCommit != "" {
+		v += "-" + version.CurrentCommit
+	}
+	fmt.Printf("go-ipfs version: %s\n", v)
 	fmt.Printf("Repo version: %d\n", fsrepo.RepoVersion)
 	fmt.Printf("System version: %s\n", runtime.GOARCH+"/"+runtime.GOOS)
 	fmt.Printf("Golang version: %s\n", runtime.Version())
