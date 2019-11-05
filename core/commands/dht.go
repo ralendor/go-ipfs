@@ -68,7 +68,7 @@ var queryDhtCmd = &cmds.Command{
 			return ErrNotDHT
 		}
 
-		id, err := peer.Decode(req.Arguments[0])
+		id, err := peer.IDB58Decode(req.Arguments[0])
 		if err != nil {
 			return cmds.ClientError("invalid peer ID")
 		}
@@ -76,28 +76,19 @@ var queryDhtCmd = &cmds.Command{
 		ctx, cancel := context.WithCancel(req.Context)
 		ctx, events := routing.RegisterForQueryEvents(ctx)
 
-		dht := nd.DHT.WAN
-		if !nd.DHT.WANActive() {
-			dht = nd.DHT.LAN
+		closestPeers, err := nd.DHT.GetClosestPeers(ctx, string(id))
+		if err != nil {
+			cancel()
+			return err
 		}
 
-		errCh := make(chan error, 1)
 		go func() {
-			defer close(errCh)
 			defer cancel()
-			closestPeers, err := dht.GetClosestPeers(ctx, string(id))
-			if closestPeers != nil {
-				for p := range closestPeers {
-					routing.PublishQueryEvent(ctx, &routing.QueryEvent{
-						ID:   p,
-						Type: routing.FinalPeer,
-					})
-				}
-			}
-
-			if err != nil {
-				errCh <- err
-				return
+			for p := range closestPeers {
+				routing.PublishQueryEvent(ctx, &routing.QueryEvent{
+					ID:   p,
+					Type: routing.FinalPeer,
+				})
 			}
 		}()
 
@@ -107,13 +98,15 @@ var queryDhtCmd = &cmds.Command{
 			}
 		}
 
-		return <-errCh
+		return nil
 	},
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *routing.QueryEvent) error {
 			pfm := pfuncMap{
-				routing.FinalPeer: func(obj *routing.QueryEvent, out io.Writer, verbose bool) error {
-					fmt.Fprintf(out, "%s\n", obj.ID)
+				routing.PeerResponse: func(obj *routing.QueryEvent, out io.Writer, verbose bool) error {
+					for _, p := range obj.Responses {
+						fmt.Fprintf(out, "%s\n", p.ID.Pretty())
+					}
 					return nil
 				},
 			}
@@ -377,7 +370,7 @@ var findPeerDhtCmd = &cmds.Command{
 			return ErrNotOnline
 		}
 
-		pid, err := peer.Decode(req.Arguments[0])
+		pid, err := peer.IDB58Decode(req.Arguments[0])
 		if err != nil {
 			return err
 		}
@@ -543,7 +536,7 @@ identified by QmFoo.
 
 	Arguments: []cmds.Argument{
 		cmds.StringArg("key", true, false, "The key to store the value at."),
-		cmds.FileArg("value-file", true, false, "A path to a file containing the value to store.").EnableStdin(),
+		cmds.FileArg("value", true, false, "The value to store.").EnableStdin(),
 	},
 	Options: []cmds.Option{
 		cmds.BoolOption(dhtVerboseOptionName, "v", "Print extra information."),
