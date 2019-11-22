@@ -9,12 +9,9 @@ import (
 
 	config "github.com/ipfs/go-ipfs-config"
 	cserialize "github.com/ipfs/go-ipfs-config/serialize"
-<<<<<<< HEAD
 
 	"github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/core/coreapi"
-=======
->>>>>>> plugins: add support for plugin configs
 	coredag "github.com/ipfs/go-ipfs/core/coredag"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
