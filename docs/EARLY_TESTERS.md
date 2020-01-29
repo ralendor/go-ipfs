@@ -2,7 +2,6 @@
 
 ## What is it?
 
-<<<<<<< HEAD
 The early testers programme allows groups using go-ipfs in production to self-volunteer to help test `go-ipfs` release candidates to ensure that no regressions that might affect production systems make it into the final release. While we invite the _entire_ community to help test releases, members of the early testers program are expected to participate directly and actively in every release.
 
 ## What are the expectations?
@@ -23,7 +22,6 @@ We will ask early testers to participate at two points in the process:
 
 ## Who has signed up?
 
-- [ ] pacman.store ([@RubenKelevra](https://github.com/RubenKelevra))
 - [ ] Infura (@MichaelMure)
 - [ ] Textile (@sanderpick)
 - [ ] Pinata (@obo20)
@@ -31,15 +29,6 @@ We will ask early testers to participate at two points in the process:
 - [ ] QRI (@b5)
 - [ ] Siderus (@koalalorenzo)
 - [ ] Charity Engine (@rytiss, @tristanolive)
-- [ ] Fission (@bmann)
-=======
-## What are the expectations?
-
-## Who has signed up?
-
-- Infura
-- Textile
->>>>>>> create stub for EARLY TESTERS
 
 ## How to sign up?
 
