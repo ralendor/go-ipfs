@@ -3,14 +3,18 @@ package peerlog
 import (
 	"fmt"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"sync/atomic"
 	"time"
+=======
+>>>>>>> feat: add peerlog plugin
 =======
 >>>>>>> feat: add peerlog plugin
 
 	core "github.com/ipfs/go-ipfs/core"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	logging "github.com/ipfs/go-log"
+<<<<<<< HEAD
 <<<<<<< HEAD
 	event "github.com/libp2p/go-libp2p-core/event"
 	network "github.com/libp2p/go-libp2p-core/network"
@@ -20,10 +24,14 @@ import (
 =======
 	network "github.com/libp2p/go-libp2p-core/network"
 >>>>>>> feat: add peerlog plugin
+=======
+	network "github.com/libp2p/go-libp2p-core/network"
+>>>>>>> feat: add peerlog plugin
 )
 
 var log = logging.Logger("plugin/peerlog")
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 type eventType int
 
@@ -46,6 +54,8 @@ type plEvent struct {
 
 =======
 >>>>>>> feat: add peerlog plugin
+=======
+>>>>>>> feat: add peerlog plugin
 // Log all the PeerIDs we see
 //
 // Usage:
@@ -53,12 +63,18 @@ type plEvent struct {
 // Output:
 //   {"level":"info","ts":"2020-02-10T13:54:26.639Z","logger":"plugin/peerlog","caller":"peerlog/peerlog.go:51","msg":"connected","peer":"QmS2H72gdrekXJggGdE9SunXPntBqdkJdkXQJjuxcH8Cbt"}
 <<<<<<< HEAD
+<<<<<<< HEAD
 //   {"level":"info","ts":"2020-02-10T13:54:59.095Z","logger":"plugin/peerlog","caller":"peerlog/peerlog.go:56","msg":"identified","peer":"QmS2H72gdrekXJggGdE9SunXPntBqdkJdkXQJjuxcH8Cbt","agent":"go-ipfs/0.5.0/"}
 //
 type peerLogPlugin struct {
 	droppedCount uint64
 	events       chan plEvent
 }
+=======
+//   {"level":"info","ts":"2020-02-10T13:54:59.095Z","logger":"plugin/peerlog","caller":"peerlog/peerlog.go:56","msg":"disconnected","peer":"QmS2H72gdrekXJggGdE9SunXPntBqdkJdkXQJjuxcH8Cbt"}
+//
+type peerLogPlugin struct{}
+>>>>>>> feat: add peerlog plugin
 =======
 //   {"level":"info","ts":"2020-02-10T13:54:59.095Z","logger":"plugin/peerlog","caller":"peerlog/peerlog.go:56","msg":"disconnected","peer":"QmS2H72gdrekXJggGdE9SunXPntBqdkJdkXQJjuxcH8Cbt"}
 //
@@ -83,6 +99,7 @@ func (*peerLogPlugin) Version() string {
 }
 
 // Init initializes plugin
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (pl *peerLogPlugin) Init(*plugin.Environment) error {
 	pl.events = make(chan plEvent, eventQueueSize)
@@ -200,14 +217,22 @@ func (pl *peerLogPlugin) Start(node *core.IpfsNode) error {
 
 =======
 func (*peerLogPlugin) Init(*plugin.Environment) error {
+=======
+func (*peerLogPlugin) Init(*plugin.Environment) error {
+	fmt.Println("peerLogPlugin enabled - PeerIDs will be logged")
+>>>>>>> feat: add peerlog plugin
 	return nil
 }
 
 func (*peerLogPlugin) Start(node *core.IpfsNode) error {
 	// Ensure logs from this plugin get printed regardless of global IPFS_LOGGING value
+<<<<<<< HEAD
 	if err := logging.SetLogLevel("plugin/peerlog", "info"); err != nil {
 		return fmt.Errorf("failed to set log level: %w", err)
 	}
+=======
+	logging.SetLogLevel("plugin/peerlog", "info")
+>>>>>>> feat: add peerlog plugin
 	var notifee network.NotifyBundle
 	notifee.ConnectedF = func(net network.Network, conn network.Conn) {
 		log.Infow("connected",
@@ -220,6 +245,9 @@ func (*peerLogPlugin) Start(node *core.IpfsNode) error {
 		)
 	}
 	node.PeerHost.Network().Notify(&notifee)
+<<<<<<< HEAD
+>>>>>>> feat: add peerlog plugin
+=======
 >>>>>>> feat: add peerlog plugin
 	return nil
 }
