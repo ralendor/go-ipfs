@@ -17,6 +17,7 @@
 # Example:
 #   # dry run. pass a 5th arg to have it print what it would do rather than do it.
 <<<<<<< HEAD
+<<<<<<< HEAD
 #   ./push-docker-tags.sh $(date -u +%F) testingsha master "" dryrun
 #    
 #   # push tag for the master branch
@@ -28,6 +29,8 @@
 #   # Serving suggestion in circle ci - https://circleci.com/docs/2.0/env-vars/#built-in-environment-variables
 #   ./push-docker-tags.sh $(date -u +%F) "$CIRCLE_SHA1" "$CIRCLE_BRANCH" "$CIRCLE_TAG"
 =======
+=======
+>>>>>>> feat: docker build and tag from ci
 #   ./push-docker-tags.sh 1 testingsha mybranch v1.0 dryrun
 #    
 #   # push tag for the master branch
@@ -36,7 +39,12 @@
 #   # push tag for a release tag
 #   ./push-docker-tags.sh 1 testingsha release v0.5.0
 #
+<<<<<<< HEAD
 #   # Serving suggestion in circle ci - https://circleci.com/docs/2.0/env-vars/#built-in-environment-variables
+#   ./push-docker-tags.sh "$CIRCLE_BUILD_NUM" "$CIRCLE_SHA1" "$CIRCLE_BRANCH" "$CIRCLE_TAG"
+>>>>>>> feat: docker build and tag from ci
+=======
+#   # Surving suggestion in circle ci - https://circleci.com/docs/2.0/env-vars/#built-in-environment-variables
 #   ./push-docker-tags.sh "$CIRCLE_BUILD_NUM" "$CIRCLE_SHA1" "$CIRCLE_BRANCH" "$CIRCLE_TAG"
 >>>>>>> feat: docker build and tag from ci
 #
@@ -65,9 +73,14 @@ pushTag () {
     echo "DRY RUN! I would have tagged and pushed the following..."
     echo docker tag "$IMAGE_NAME:$WIP_IMAGE_TAG" "$IMAGE_NAME:$IMAGE_TAG"
 <<<<<<< HEAD
+<<<<<<< HEAD
     echo docker push "$IMAGE_NAME:$IMAGE_TAG"
   else
     echo "Tagging $IMAGE_NAME:$IMAGE_TAG and pushing to dockerhub"
+=======
+    echo docker push "$IMAGE_NAME:$IMAGE_TAG"  
+  else 
+>>>>>>> feat: docker build and tag from ci
 =======
     echo docker push "$IMAGE_NAME:$IMAGE_TAG"  
   else 
@@ -77,6 +90,7 @@ pushTag () {
   fi
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 if [[ $GIT_TAG =~ ^v[0-9]+ ]]; then
   pushTag "$GIT_TAG"
@@ -91,18 +105,31 @@ elif [ "$GIT_BRANCH" = "master" ]; then
   pushTag "master-latest"
 =======
 if [[ $GIT_TAG =~ ^v[0-9]+ ]]; then 
+=======
+if [[ $GIT_TAG =~ ^v[0-9]+ ]]; then 
+  pushTag "$GIT_TAG"
+
+elif [[ $GIT_TAG =~ ^cluster ]]; then 
+>>>>>>> feat: docker build and tag from ci
   pushTag "$GIT_TAG"
 
 elif [ "$GIT_BRANCH" = "feat/stabilize-dht" ]; then 
   pushTag "bifrost-${BUILD_NUM}-${GIT_SHA1_SHORT}"
+<<<<<<< HEAD
   pushTag "bifrost-latest"
+=======
+>>>>>>> feat: docker build and tag from ci
 
 elif [ "$GIT_BRANCH" = "release" ]; then 
   pushTag "release"
   pushTag "latest"
 
 elif [ "$GIT_BRANCH" = "master" ]; then 
+<<<<<<< HEAD
   pushTag "master-${BUILD_NUM}-${GIT_SHA1_SHORT}"
+  pushTag "master"
+>>>>>>> feat: docker build and tag from ci
+=======
   pushTag "master"
 >>>>>>> feat: docker build and tag from ci
 
