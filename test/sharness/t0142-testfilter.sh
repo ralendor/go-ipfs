@@ -22,12 +22,18 @@ test_expect_success 'filter 127.0.0.0/24 on node 1' '
 
 for i in $(seq 0 $(( NUM_NODES - 1 ))); do
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> test(sharness): test address filtering
   test_expect_success 'enable quic for node $i' '
     echo "$i"
     ipfsi $i config --json Experimental.QUIC true
   '
 
+<<<<<<< HEAD
+>>>>>>> test(sharness): test address filtering
+=======
 >>>>>>> test(sharness): test address filtering
   test_expect_success "change IP for node $i" '
     ipfsi $i config --json "Addresses.Swarm" \
