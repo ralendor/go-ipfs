@@ -4,6 +4,7 @@ contact_links:
    url: https://ipfs.io/help
    about: All information about how and where to get help on IPFS.
 <<<<<<< HEAD
+<<<<<<< HEAD
  - name: Go-ipfs configuration reference
    url: https://github.com/ipfs/go-ipfs/blob/master/docs/config.md
    about: Documentation on the different configuration settings
@@ -13,6 +14,8 @@ contact_links:
  - name: HTTP API Reference
    url: https://docs.ipfs.io/reference/http/api/#api-v0-add
    about: Documentation of all go-ipfs HTTP API endpoints.
+=======
+>>>>>>> Add standard issue template
 =======
 >>>>>>> Add standard issue template
  - name: IPFS Official Forum
