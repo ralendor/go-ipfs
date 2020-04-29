@@ -3,9 +3,12 @@
 # issueOpened: ""
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Disabled
 # pullRequestOpened: ""
 =======
+=======
+>>>>>>> Auto-comment on submitted PRs
 pullRequestOpened: >
 
   Thank you for submitting this PR!
@@ -16,6 +19,7 @@ pullRequestOpened: >
   the contribution process. However, we are also overloaded with work, we'd be
   happy if you can make sure that:
 
+<<<<<<< HEAD
     * The context for this PR is clear, with relevant discussion, decisions
       and stakeholders linked/mentioned.
 
@@ -25,6 +29,15 @@ pullRequestOpened: >
       reviewing this code next does not have to be super familiar with the
       affected codebase. Follow the [code contribution
       guidelines](https://github.com/ipfs/community/blob/master/CONTRIBUTING.md#code-contribution-guidelines)
+=======
+    * The context for this PR is cleared, with relevant discussion, decisions
+      and stakeholders linked/mentioned.
+
+    * You have self-reviewed yourself. Please make a self-review and leave
+      comments providing the rationale behind your changes as needed.  Expect
+      that the person reviewing this code next does not have to be super
+      familiar with the affected codebase. Follow the [code contribution guidelines](https://github.com/ipfs/community/blob/master/CONTRIBUTING.md#code-contribution-guidelines)
+>>>>>>> Auto-comment on submitted PRs
       when they apply.
 
     * Getting additional reviews from additional people (community members
@@ -47,4 +60,7 @@ pullRequestOpened: >
   priorities and status of your contribution.
 
   Again, thank you for contributing!
+<<<<<<< HEAD
+>>>>>>> Auto-comment on submitted PRs
+=======
 >>>>>>> Auto-comment on submitted PRs
