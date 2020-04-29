@@ -9,6 +9,7 @@ newIssueWelcomeComment: >
   In the meantime, please double-check that you have provided all the
   necessary information to make this process easy! Any information that can
 <<<<<<< HEAD
+<<<<<<< HEAD
   help save additional round trips is useful! We currently aim to give
   initial feedback within **two business days**. If this does not happen, feel
   free to leave a comment.
@@ -20,16 +21,26 @@ newIssueWelcomeComment: >
     - "Priority" labels will show how urgent this is for the team.
     - "Status" labels will show if this is ready to be worked on, blocked, or in progress.
 =======
+=======
+>>>>>>> Welcome message for users opening their first issue.
   help saving additional round trips is useful! We currently aim to give
   initial feedback within **two business days**. If this does not happen, feel
   free to leave a comment.
 
+<<<<<<< HEAD
   Please keep an eye on how this issue will be labeled, as labels give an
   overview of priorities, assignments and additional actions requested by the
+=======
+  Please keep an eye on how this issue will be labeled, as labels will give an
+  overview of priorities, assignments and additional actions as requested by the
+>>>>>>> Welcome message for users opening their first issue.
   maintainers:
 
     - "Priority" labels will show how urgent this is for the team.
     - "Status" labels will show if this is ready to be worked on, blocked etc...
+<<<<<<< HEAD
+>>>>>>> Welcome message for users opening their first issue.
+=======
 >>>>>>> Welcome message for users opening their first issue.
     - "Need" labels will indicate if additional input or analysis is required.
 
@@ -38,6 +49,7 @@ newIssueWelcomeComment: >
 
 # Configuration for new-pr-welcome - https://github.com/behaviorbot/new-pr-welcome
 # Comment to be posted to on PRs from first time contributors in your repository
+<<<<<<< HEAD
 <<<<<<< HEAD
 newPRWelcomeComment: >
   Thank you for submitting this PR!
@@ -75,6 +87,10 @@ newPRWelcomeComment: >
 
   We are very grateful for your contribution!
 
+=======
+# Currently disabled
+# newPRWelcomeComment: ""
+>>>>>>> Welcome message for users opening their first issue.
 =======
 # Currently disabled
 # newPRWelcomeComment: ""
