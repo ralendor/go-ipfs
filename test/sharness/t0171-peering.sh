@@ -88,7 +88,11 @@ disconnect() {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Bidirectional peering shouldn't cause problems (e.g., simultaneous connect
+=======
+# Bidiractional peering shouldn't cause problems (e.g., simultaneous connect
+>>>>>>> feat: implement peering service
 =======
 # Bidiractional peering shouldn't cause problems (e.g., simultaneous connect
 >>>>>>> feat: implement peering service
