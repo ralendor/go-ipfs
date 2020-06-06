@@ -14,6 +14,10 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 // Seed the random number generator.
 //
 // We don't need good randomness, but we do need randomness.
@@ -25,6 +29,15 @@ const (
 	// between 90-100% of the max backoff.
 	maxBackoffJitter = 10 // %
 	connmgrTag       = "ipfs-peering"
+<<<<<<< HEAD
+=======
+// maxBackoff is the maximum time between reconnect attempts.
+const (
+	maxBackoff = 10 * time.Minute
+	connmgrTag = "ipfs-peering"
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 	// This needs to be sufficient to prevent two sides from simultaneously
 	// dialing.
 	initialDelay = 5 * time.Second
@@ -47,13 +60,29 @@ type peerHandler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 	mu             sync.Mutex
 	addrs          []multiaddr.Multiaddr
 	reconnectTimer *time.Timer
+=======
+	mu    sync.Mutex
+	addrs []multiaddr.Multiaddr
+	timer *time.Timer
+>>>>>>> feat: implement peering service
+=======
+	mu             sync.Mutex
+	addrs          []multiaddr.Multiaddr
+	reconnectTimer *time.Timer
+>>>>>>> master
 
 	nextDelay time.Duration
 }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 // setAddrs sets the addresses for this peer.
 func (ph *peerHandler) setAddrs(addrs []multiaddr.Multiaddr) {
 	// Not strictly necessary, but it helps to not trust the calling code.
@@ -81,10 +110,26 @@ func (ph *peerHandler) stop() {
 	if ph.reconnectTimer != nil {
 		ph.reconnectTimer.Stop()
 		ph.reconnectTimer = nil
+<<<<<<< HEAD
+=======
+func (ph *peerHandler) stop() {
+	ph.mu.Lock()
+	defer ph.mu.Unlock()
+
+	if ph.timer != nil {
+		ph.timer.Stop()
+		ph.timer = nil
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 	}
 }
 
 func (ph *peerHandler) nextBackoff() time.Duration {
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 	if ph.nextDelay < maxBackoff {
 		ph.nextDelay += ph.nextDelay/2 + time.Duration(rand.Int63n(int64(ph.nextDelay)))
 	}
@@ -96,12 +141,33 @@ func (ph *peerHandler) nextBackoff() time.Duration {
 		ph.nextDelay -= time.Duration(rand.Int63n(int64(maxBackoff) * maxBackoffJitter / 100))
 	}
 
+<<<<<<< HEAD
+=======
+	// calculate the timeout
+	if ph.nextDelay < maxBackoff {
+		ph.nextDelay += ph.nextDelay/2 + time.Duration(rand.Int63n(int64(ph.nextDelay)))
+	}
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 	return ph.nextDelay
 }
 
 func (ph *peerHandler) reconnect() {
 	// Try connecting
+<<<<<<< HEAD
+<<<<<<< HEAD
 	addrs := ph.getAddrs()
+=======
+
+	ph.mu.Lock()
+	addrs := append(([]multiaddr.Multiaddr)(nil), ph.addrs...)
+	ph.mu.Unlock()
+
+>>>>>>> feat: implement peering service
+=======
+	addrs := ph.getAddrs()
+>>>>>>> master
 	logger.Debugw("reconnecting", "peer", ph.peer, "addrs", addrs)
 
 	err := ph.host.Connect(ph.ctx, peer.AddrInfo{ID: ph.peer, Addrs: addrs})
@@ -109,10 +175,23 @@ func (ph *peerHandler) reconnect() {
 		logger.Debugw("failed to reconnect", "peer", ph.peer, "error", err)
 		// Ok, we failed. Extend the timeout.
 		ph.mu.Lock()
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 		if ph.reconnectTimer != nil {
 			// Only counts if the reconnectTimer still exists. If not, a
 			// connection _was_ somehow established.
 			ph.reconnectTimer.Reset(ph.nextBackoff())
+<<<<<<< HEAD
+=======
+		if ph.timer != nil {
+			// Only counts if the timer still exists. If not, a
+			// connection _was_ somehow established.
+			ph.timer.Reset(ph.nextBackoff())
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 		}
 		// Otherwise, someone else has stopped us so we can assume that
 		// we're either connected or someone else will start us.
@@ -128,10 +207,23 @@ func (ph *peerHandler) stopIfConnected() {
 	ph.mu.Lock()
 	defer ph.mu.Unlock()
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 	if ph.reconnectTimer != nil && ph.host.Network().Connectedness(ph.peer) == network.Connected {
 		logger.Debugw("successfully reconnected", "peer", ph.peer)
 		ph.reconnectTimer.Stop()
 		ph.reconnectTimer = nil
+<<<<<<< HEAD
+=======
+	if ph.timer != nil && ph.host.Network().Connectedness(ph.peer) == network.Connected {
+		logger.Debugw("successfully reconnected", "peer", ph.peer)
+		ph.timer.Stop()
+		ph.timer = nil
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 		ph.nextDelay = initialDelay
 	}
 }
@@ -141,10 +233,23 @@ func (ph *peerHandler) startIfDisconnected() {
 	ph.mu.Lock()
 	defer ph.mu.Unlock()
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 	if ph.reconnectTimer == nil && ph.host.Network().Connectedness(ph.peer) != network.Connected {
 		logger.Debugw("disconnected from peer", "peer", ph.peer)
 		// Always start with a short timeout so we can stagger things a bit.
 		ph.reconnectTimer = time.AfterFunc(ph.nextBackoff(), ph.reconnect)
+<<<<<<< HEAD
+=======
+	if ph.timer == nil && ph.host.Network().Connectedness(ph.peer) != network.Connected {
+		logger.Debugw("disconnected from peer", "peer", ph.peer)
+		// Always start with a short timeout so we can stagger things a bit.
+		ph.timer = time.AfterFunc(ph.nextBackoff(), ph.reconnect)
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 	}
 }
 
@@ -155,13 +260,34 @@ type PeeringService struct {
 
 	mu    sync.RWMutex
 	peers map[peer.ID]*peerHandler
+<<<<<<< HEAD
+<<<<<<< HEAD
 	state state
+=======
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	state  state
+>>>>>>> feat: implement peering service
+=======
+	state state
+>>>>>>> master
 }
 
 // NewPeeringService constructs a new peering service. Peers can be added and
 // removed immediately, but connections won't be formed until `Start` is called.
 func NewPeeringService(host host.Host) *PeeringService {
+<<<<<<< HEAD
+<<<<<<< HEAD
 	return &PeeringService{host: host, peers: make(map[peer.ID]*peerHandler)}
+=======
+	ps := &PeeringService{host: host, peers: make(map[peer.ID]*peerHandler)}
+	ps.ctx, ps.cancel = context.WithCancel(context.Background())
+	return ps
+>>>>>>> feat: implement peering service
+=======
+	return &PeeringService{host: host, peers: make(map[peer.ID]*peerHandler)}
+>>>>>>> master
 }
 
 // Start starts the peering service, connecting and maintaining connections to
@@ -189,18 +315,41 @@ func (ps *PeeringService) Start() error {
 
 // Stop stops the peering service.
 func (ps *PeeringService) Stop() error {
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+	ps.cancel()
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 	ps.host.Network().StopNotify((*netNotifee)(ps))
 
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 	switch ps.state {
 	case stateInit, stateRunning:
+=======
+	if ps.state == stateRunning {
+>>>>>>> feat: implement peering service
+=======
+	switch ps.state {
+	case stateInit, stateRunning:
+>>>>>>> master
 		logger.Infow("stopping")
 		for _, handler := range ps.peers {
 			handler.stop()
 		}
+<<<<<<< HEAD
+<<<<<<< HEAD
 		ps.state = stateStopped
+=======
+>>>>>>> feat: implement peering service
+=======
+		ps.state = stateStopped
+>>>>>>> master
 	}
 	return nil
 }
@@ -217,7 +366,15 @@ func (ps *PeeringService) AddPeer(info peer.AddrInfo) {
 
 	if handler, ok := ps.peers[info.ID]; ok {
 		logger.Infow("updating addresses", "peer", info.ID, "addrs", info.Addrs)
+<<<<<<< HEAD
+<<<<<<< HEAD
 		handler.setAddrs(info.Addrs)
+=======
+		handler.addrs = info.Addrs
+>>>>>>> feat: implement peering service
+=======
+		handler.setAddrs(info.Addrs)
+>>>>>>> master
 	} else {
 		logger.Infow("peer added", "peer", info.ID, "addrs", info.Addrs)
 		ps.host.ConnManager().Protect(info.ID, connmgrTag)
@@ -228,6 +385,10 @@ func (ps *PeeringService) AddPeer(info peer.AddrInfo) {
 			addrs:     info.Addrs,
 			nextDelay: initialDelay,
 		}
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> master
 		handler.ctx, handler.cancel = context.WithCancel(context.Background())
 		ps.peers[info.ID] = handler
 		switch ps.state {
@@ -238,6 +399,15 @@ func (ps *PeeringService) AddPeer(info peer.AddrInfo) {
 			// it's easier to reason about. But we should still free
 			// resources.
 			handler.cancel()
+<<<<<<< HEAD
+=======
+		handler.ctx, handler.cancel = context.WithCancel(ps.ctx)
+		ps.peers[info.ID] = handler
+		if ps.state == stateRunning {
+			go handler.startIfDisconnected()
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 		}
 	}
 }
@@ -254,6 +424,13 @@ func (ps *PeeringService) RemovePeer(id peer.ID) {
 		ps.host.ConnManager().Unprotect(id, connmgrTag)
 
 		handler.stop()
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+		handler.cancel()
+>>>>>>> feat: implement peering service
+=======
+>>>>>>> master
 		delete(ps.peers, id)
 	}
 }

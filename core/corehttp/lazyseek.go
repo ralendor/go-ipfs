@@ -42,7 +42,15 @@ func (s *lazySeeker) Read(b []byte) (int, error) {
 	for s.offset != s.realOffset {
 		off, err := s.reader.Seek(s.offset, io.SeekStart)
 		if err != nil {
+<<<<<<< HEAD
+<<<<<<< HEAD
 			return 0, err
+=======
+			return 9, err
+>>>>>>> fix(gateway): better seeking/sized
+=======
+			return 0, err
+>>>>>>> master
 		}
 		s.realOffset = off
 	}
