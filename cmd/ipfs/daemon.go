@@ -12,37 +12,31 @@ import (
 	"sort"
 	"sync"
 
-	multierror "github.com/hashicorp/go-multierror"
-
 	version "github.com/ipfs/go-ipfs"
-	config "github.com/ipfs/go-ipfs-config"
-	cserial "github.com/ipfs/go-ipfs-config/serialize"
 	utilmain "github.com/ipfs/go-ipfs/cmd/ipfs/util"
 	oldcmds "github.com/ipfs/go-ipfs/commands"
 	"github.com/ipfs/go-ipfs/core"
 	commands "github.com/ipfs/go-ipfs/core/commands"
+	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
-	libp2p "github.com/ipfs/go-ipfs/core/node/libp2p"
 	nodeMount "github.com/ipfs/go-ipfs/fuse/node"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
 	migrate "github.com/ipfs/go-ipfs/repo/fsrepo/migrations"
-	sockets "github.com/libp2p/go-socket-activation"
 
-	cmds "github.com/ipfs/go-ipfs-cmds"
-	mprome "github.com/ipfs/go-metrics-prometheus"
-	goprocess "github.com/jbenet/goprocess"
-	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
-	prometheus "github.com/prometheus/client_golang/prometheus"
-	promauto "github.com/prometheus/client_golang/prometheus/promauto"
+	ma "gx/ipfs/QmNTCey11oxhb1AxDnQBRHtdhap6Ctud872NjAYPYYXPuc/go-multiaddr"
+	cmds "gx/ipfs/QmR77mMvvh8mJBBWQmBfQBu8oD38NUN4KE9SL2gDgAQNc6/go-ipfs-cmds"
+	goprocess "gx/ipfs/QmSF8fPo3jgVBAy8fpdjjYqgG87dkJgUprRBHRd2tmfgpP/goprocess"
+	"gx/ipfs/QmTQuFQWHAWy4wMH6ZyPfGiawA5u9T8rs79FENoV8yXaoS/client_golang/prometheus"
+	mprome "gx/ipfs/QmVMcMs6duiwLzvhF6xWM3yc4GgjpNoctKFhvtBch5tpgo/go-metrics-prometheus"
+	"gx/ipfs/QmZcLBXKaFe8ND5YHPkJRAwmhJGrVsi1JqDZNyJ4nRK5Mj/go-multiaddr-net"
+	"gx/ipfs/Qmde5VP1qUkyQXKCfmEUA7bP64V2HAptbJ7phuPp7jXWwg/go-ipfs-cmdkit"
 )
 
 const (
 	adjustFDLimitKwd          = "manage-fdlimit"
 	enableGCKwd               = "enable-gc"
 	initOptionKwd             = "init"
-	initConfigOptionKwd       = "init-config"
 	initProfileOptionKwd      = "init-profile"
 	ipfsMountKwd              = "mount-ipfs"
 	ipnsMountKwd              = "mount-ipns"
@@ -53,7 +47,6 @@ const (
 	routingOptionSupernodeKwd = "supernode"
 	routingOptionDHTClientKwd = "dhtclient"
 	routingOptionDHTKwd       = "dht"
-	routingOptionDHTServerKwd = "dhtserver"
 	routingOptionNoneKwd      = "none"
 	routingOptionDefaultKwd   = "default"
 	unencryptTransportKwd     = "disable-transport-encryption"
@@ -62,12 +55,13 @@ const (
 	enablePubSubKwd           = "enable-pubsub-experiment"
 	enableIPNSPubSubKwd       = "enable-namesys-pubsub"
 	enableMultiplexKwd        = "enable-mplex-experiment"
+	enableFollowKwd           = "enable-follow-experiment"
 	// apiAddrKwd    = "address-api"
 	// swarmAddrKwd  = "address-swarm"
 )
 
 var daemonCmd = &cmds.Command{
-	Helptext: cmds.HelpText{
+	Helptext: cmdkit.HelpText{
 		Tagline: "Run a network-connected IPFS node.",
 		ShortDescription: `
 'ipfs daemon' runs a persistent ipfs daemon that can serve commands
@@ -105,8 +99,8 @@ ipfs supports passing arbitrary headers to the API and Gateway. You can
 do this by setting headers on the API.HTTPHeaders and Gateway.HTTPHeaders
 keys:
 
-  ipfs config --json API.HTTPHeaders.X-Special-Header "[\"so special :)\"]"
-  ipfs config --json Gateway.HTTPHeaders.X-Special-Header "[\"so special :)\"]"
+  ipfs config --json API.HTTPHeaders.X-Special-Header '["so special :)"]'
+  ipfs config --json Gateway.HTTPHeaders.X-Special-Header '["so special :)"]'
 
 Note that the value of the keys is an _array_ of strings. This is because
 headers can have more than one value, and it is convenient to pass through
@@ -116,13 +110,13 @@ CORS Headers (for API)
 
 You can setup CORS headers the same way:
 
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin "[\"example.com\"]"
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods "[\"PUT\", \"GET\", \"POST\"]"
-  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials "[\"true\"]"
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["example.com"]'
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
+  ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
 
 Shutdown
 
-To shut down the daemon, send a SIGINT signal to it (e.g. by pressing 'Ctrl-C')
+To shutdown the daemon, send a SIGINT signal to it (e.g. by pressing 'Ctrl-C')
 or send a SIGTERM signal to it (e.g. with 'kill'). It may take a while for the
 daemon to shutdown gracefully, but it can be killed forcibly by sending a
 second signal.
@@ -158,27 +152,27 @@ Headers.
 `,
 	},
 
-	Options: []cmds.Option{
-		cmds.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
-		cmds.StringOption(initConfigOptionKwd, "Path to existing configuration file to be loaded during --init"),
-		cmds.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
-		cmds.StringOption(routingOptionKwd, "Overrides the routing option").WithDefault(routingOptionDefaultKwd),
-		cmds.BoolOption(mountKwd, "Mounts IPFS to the filesystem"),
-		cmds.BoolOption(writableKwd, "Enable writing objects (with POST, PUT and DELETE)"),
-		cmds.StringOption(ipfsMountKwd, "Path to the mountpoint for IPFS (if using --mount). Defaults to config setting."),
-		cmds.StringOption(ipnsMountKwd, "Path to the mountpoint for IPNS (if using --mount). Defaults to config setting."),
-		cmds.BoolOption(unrestrictedApiAccessKwd, "Allow API access to unlisted hashes"),
-		cmds.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
-		cmds.BoolOption(enableGCKwd, "Enable automatic periodic repo garbage collection"),
-		cmds.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
-		cmds.BoolOption(migrateKwd, "If true, assume yes at the migrate prompt. If false, assume no."),
-		cmds.BoolOption(enablePubSubKwd, "Instantiate the ipfs daemon with the experimental pubsub feature enabled."),
-		cmds.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
-		cmds.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
+	Options: []cmdkit.Option{
+		cmdkit.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
+		cmdkit.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
+		cmdkit.StringOption(routingOptionKwd, "Overrides the routing option").WithDefault(routingOptionDefaultKwd),
+		cmdkit.BoolOption(mountKwd, "Mounts IPFS to the filesystem"),
+		cmdkit.BoolOption(writableKwd, "Enable writing objects (with POST, PUT and DELETE)"),
+		cmdkit.StringOption(ipfsMountKwd, "Path to the mountpoint for IPFS (if using --mount). Defaults to config setting."),
+		cmdkit.StringOption(ipnsMountKwd, "Path to the mountpoint for IPNS (if using --mount). Defaults to config setting."),
+		cmdkit.BoolOption(unrestrictedApiAccessKwd, "Allow API access to unlisted hashes"),
+		cmdkit.BoolOption(unencryptTransportKwd, "Disable transport encryption (for debugging protocols)"),
+		cmdkit.BoolOption(enableGCKwd, "Enable automatic periodic repo garbage collection"),
+		cmdkit.BoolOption(adjustFDLimitKwd, "Check and raise file descriptor limits if needed").WithDefault(true),
+		cmdkit.BoolOption(migrateKwd, "If true, assume yes at the migrate prompt. If false, assume no."),
+		cmdkit.BoolOption(enablePubSubKwd, "Instantiate the ipfs daemon with the experimental pubsub feature enabled."),
+		cmdkit.BoolOption(enableIPNSPubSubKwd, "Enable IPNS record distribution through pubsub; enables pubsub."),
+		cmdkit.BoolOption(enableMultiplexKwd, "Add the experimental 'go-multiplex' stream muxer to libp2p on construction.").WithDefault(true),
+		cmdkit.BoolOption(enableFollowKwd, "Enable IPNS name following."),
 
 		// TODO: add way to override addresses. tricky part: updating the config if also --init.
-		// cmds.StringOption(apiAddrKwd, "Address for the daemon rpc API (overrides config)"),
-		// cmds.StringOption(swarmAddrKwd, "Address for the swarm socket (overrides config)"),
+		// cmdkit.StringOption(apiAddrKwd, "Address for the daemon rpc API (overrides config)"),
+		// cmdkit.StringOption(swarmAddrKwd, "Address for the swarm socket (overrides config)"),
 	},
 	Subcommands: map[string]*cmds.Command{},
 	Run:         daemonFunc,
@@ -229,26 +223,23 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// check transport encryption flag.
 	unencrypted, _ := req.Options[unencryptTransportKwd].(bool)
 	if unencrypted {
-		log.Warnf(`Running with --%s: All connections are UNENCRYPTED.
+		log.Warningf(`Running with --%s: All connections are UNENCRYPTED.
 		You will not be able to connect to regular encrypted networks.`, unencryptTransportKwd)
 	}
 
 	// first, whether user has provided the initialization flag. we may be
 	// running in an uninitialized state.
 	initialize, _ := req.Options[initOptionKwd].(bool)
-	if initialize && !fsrepo.IsInitialized(cctx.ConfigRoot) {
-		cfgLocation, _ := req.Options[initConfigOptionKwd].(string)
-		profiles, _ := req.Options[initProfileOptionKwd].(string)
-		var conf *config.Config
+	if initialize {
 
-		if cfgLocation != "" {
-			if conf, err = cserial.Load(cfgLocation); err != nil {
+		cfg := cctx.ConfigRoot
+		if !fsrepo.IsInitialized(cfg) {
+			profiles, _ := req.Options[initProfileOptionKwd].(string)
+
+			err := initWithDefaults(os.Stdout, cfg, profiles)
+			if err != nil {
 				return err
 			}
-		}
-
-		if err = doInit(os.Stdout, cctx.ConfigRoot, false, nBitsForKeypairDefault, profiles, conf); err != nil {
-			return err
 		}
 	}
 
@@ -289,14 +280,16 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		break
 	}
 
-	// The node will also close the repo but there are many places we could
-	// fail before we get to that. It can't hurt to close it twice.
-	defer repo.Close()
+	cfg, err := cctx.GetConfig()
+	if err != nil {
+		return err
+	}
 
 	offline, _ := req.Options[offlineKwd].(bool)
 	ipnsps, _ := req.Options[enableIPNSPubSubKwd].(bool)
 	pubsub, _ := req.Options[enablePubSubKwd].(bool)
 	mplex, _ := req.Options[enableMultiplexKwd].(bool)
+	follow, _ := req.Options[enableFollowKwd].(bool)
 
 	// Start assembling node config
 	ncfg := &core.BuildCfg{
@@ -308,6 +301,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 			"pubsub": pubsub,
 			"ipnsps": ipnsps,
 			"mplex":  mplex,
+			"follow": follow,
 		},
 		//TODO(Kubuxu): refactor Online vs Offline by adding Permanent vs Ephemeral
 	}
@@ -328,13 +322,11 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	case routingOptionSupernodeKwd:
 		return errors.New("supernode routing was never fully implemented and has been removed")
 	case routingOptionDHTClientKwd:
-		ncfg.Routing = libp2p.DHTClientOption
+		ncfg.Routing = core.DHTClientOption
 	case routingOptionDHTKwd:
-		ncfg.Routing = libp2p.DHTOption
-	case routingOptionDHTServerKwd:
-		ncfg.Routing = libp2p.DHTServerOption
+		ncfg.Routing = core.DHTOption
 	case routingOptionNoneKwd:
-		ncfg.Routing = libp2p.NilRouterOption
+		ncfg.Routing = core.NilRouterOption
 	default:
 		return fmt.Errorf("unrecognized routing option: %s", routingOption)
 	}
@@ -344,7 +336,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		log.Error("error from node construction: ", err)
 		return err
 	}
-	node.IsDaemon = true
+	node.SetLocal(false)
 
 	if node.PNetFingerprint != nil {
 		fmt.Println("Swarm is limited to private network of peers with the swarm key")
@@ -371,11 +363,15 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	// Start "core" plugins. We want to do this *before* starting the HTTP
 	// API as the user may be relying on these plugins.
-	err = cctx.Plugins.Start(node)
+	api, err := coreapi.NewCoreAPI(node)
 	if err != nil {
 		return err
 	}
-	node.Process.AddChild(goprocess.WithTeardown(cctx.Plugins.Close))
+	err = cctx.Plugins.Start(api)
+	if err != nil {
+		return err
+	}
+	node.Process().AddChild(goprocess.WithTeardown(cctx.Plugins.Close))
 
 	// construct api endpoint - every time
 	apiErrc, err := serveHTTPApi(req, cctx)
@@ -386,7 +382,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// construct fuse mountpoints - if the user provided the --mount flag
 	mount, _ := req.Options[mountKwd].(bool)
 	if mount && offline {
-		return cmds.Errorf(cmds.ErrClient, "mount is not currently supported in offline mode")
+		return cmdkit.Errorf(cmdkit.ErrClient, "mount is not currently supported in offline mode")
 	}
 	if mount {
 		if err := mountFuse(req, cctx); err != nil {
@@ -400,49 +396,38 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	// construct http gateway
-	gwErrc, err := serveHTTPGateway(req, cctx)
-	if err != nil {
-		return err
+	// construct http gateway - if it is set in the config
+	var gwErrc <-chan error
+	if len(cfg.Addresses.Gateway) > 0 {
+		var err error
+		gwErrc, err = serveHTTPGateway(req, cctx)
+		if err != nil {
+			return err
+		}
 	}
-
-	// Add ipfs version info to prometheus metrics
-	var ipfsInfoMetric = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "ipfs_info",
-		Help: "IPFS version information.",
-	}, []string{"version", "commit"})
-
-	// Setting to 1 lets us multiply it with other stats to add the version labels
-	ipfsInfoMetric.With(prometheus.Labels{
-		"version": version.CurrentVersionNumber,
-		"commit":  version.CurrentCommit,
-	}).Set(1)
 
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.IpfsNodeCollector{Node: node})
 
 	// The daemon is *finally* ready.
 	fmt.Printf("Daemon is ready\n")
-	notifyReady()
 
 	// Give the user some immediate feedback when they hit C-c
 	go func() {
 		<-req.Context.Done()
-		notifyStopping()
 		fmt.Println("Received interrupt signal, shutting down...")
 		fmt.Println("(Hit ctrl-c again to force-shutdown the daemon.)")
 	}()
 
 	// collect long-running errors and block for shutdown
-	// TODO(cryptix): our fuse currently doesn't follow this pattern for graceful shutdown
-	var errs error
+	// TODO(cryptix): our fuse currently doesnt follow this pattern for graceful shutdown
 	for err := range merge(apiErrc, gwErrc, gcErrc) {
 		if err != nil {
-			errs = multierror.Append(errs, err)
+			return err
 		}
 	}
 
-	return errs
+	return nil
 }
 
 // serveHTTPApi collects options, creates listener, prints status message and starts serving requests
@@ -450,11 +435,6 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 	cfg, err := cctx.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("serveHTTPApi: GetConfig() failed: %s", err)
-	}
-
-	listeners, err := sockets.TakeListeners("io.ipfs.api")
-	if err != nil {
-		return nil, fmt.Errorf("serveHTTPApi: socket activation failed: %s", err)
 	}
 
 	apiAddrs := make([]string, 0, 2)
@@ -465,18 +445,11 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		apiAddrs = append(apiAddrs, apiAddr)
 	}
 
-	listenerAddrs := make(map[string]bool, len(listeners))
-	for _, listener := range listeners {
-		listenerAddrs[string(listener.Multiaddr().Bytes())] = true
-	}
-
+	listeners := make([]manet.Listener, 0, len(apiAddrs))
 	for _, addr := range apiAddrs {
 		apiMaddr, err := ma.NewMultiaddr(addr)
 		if err != nil {
-			return nil, fmt.Errorf("serveHTTPApi: invalid API address: %q (err: %s)", addr, err)
-		}
-		if listenerAddrs[string(apiMaddr.Bytes())] {
-			continue
+			return nil, fmt.Errorf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
 		}
 
 		apiLis, err := manet.Listen(apiMaddr)
@@ -484,18 +457,11 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 			return nil, fmt.Errorf("serveHTTPApi: manet.Listen(%s) failed: %s", apiMaddr, err)
 		}
 
-		listenerAddrs[string(apiMaddr.Bytes())] = true
+		// we might have listened to /tcp/0 - lets see what we are listing on
+		apiMaddr = apiLis.Multiaddr()
+		fmt.Printf("API server listening on %s\n", apiMaddr)
+		fmt.Printf("WebUI: http://%s/webui\n", apiLis.Addr())
 		listeners = append(listeners, apiLis)
-	}
-
-	for _, listener := range listeners {
-		// we might have listened to /tcp/0 - let's see what we are listing on
-		fmt.Printf("API server listening on %s\n", listener.Multiaddr())
-		// Browsers require TCP.
-		switch listener.Addr().Network() {
-		case "tcp", "tcp4", "tcp6":
-			fmt.Printf("WebUI: http://%s/webui\n", listener.Addr())
-		}
 	}
 
 	// by default, we don't let you load arbitrary ipfs objects through the api,
@@ -555,7 +521,7 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 
 // printSwarmAddrs prints the addresses of the host
 func printSwarmAddrs(node *core.IpfsNode) {
-	if !node.IsOnline {
+	if !node.OnlineMode() {
 		fmt.Println("Swarm not listening, running in offline mode.")
 		return
 	}
@@ -568,7 +534,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	for _, addr := range ifaceAddrs {
 		lisAddrs = append(lisAddrs, addr.String())
 	}
-	sort.Strings(lisAddrs)
+	sort.Sort(sort.StringSlice(lisAddrs))
 	for _, addr := range lisAddrs {
 		fmt.Printf("Swarm listening on %s\n", addr)
 	}
@@ -577,7 +543,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	for _, addr := range node.PeerHost.Addrs() {
 		addrs = append(addrs, addr.String())
 	}
-	sort.Strings(addrs)
+	sort.Sort(sort.StringSlice(addrs))
 	for _, addr := range addrs {
 		fmt.Printf("Swarm announcing %s\n", addr)
 	}
@@ -596,43 +562,28 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 		writable = cfg.Gateway.Writable
 	}
 
-	listeners, err := sockets.TakeListeners("io.ipfs.gateway")
-	if err != nil {
-		return nil, fmt.Errorf("serveHTTPGateway: socket activation failed: %s", err)
-	}
-
-	listenerAddrs := make(map[string]bool, len(listeners))
-	for _, listener := range listeners {
-		listenerAddrs[string(listener.Multiaddr().Bytes())] = true
-	}
-
 	gatewayAddrs := cfg.Addresses.Gateway
+	listeners := make([]manet.Listener, 0, len(gatewayAddrs))
 	for _, addr := range gatewayAddrs {
 		gatewayMaddr, err := ma.NewMultiaddr(addr)
 		if err != nil {
 			return nil, fmt.Errorf("serveHTTPGateway: invalid gateway address: %q (err: %s)", addr, err)
 		}
 
-		if listenerAddrs[string(gatewayMaddr.Bytes())] {
-			continue
-		}
-
 		gwLis, err := manet.Listen(gatewayMaddr)
 		if err != nil {
 			return nil, fmt.Errorf("serveHTTPGateway: manet.Listen(%s) failed: %s", gatewayMaddr, err)
 		}
-		listenerAddrs[string(gatewayMaddr.Bytes())] = true
+		// we might have listened to /tcp/0 - lets see what we are listing on
+		gatewayMaddr = gwLis.Multiaddr()
+
+		if writable {
+			fmt.Printf("Gateway (writable) server listening on %s\n", gatewayMaddr)
+		} else {
+			fmt.Printf("Gateway (readonly) server listening on %s\n", gatewayMaddr)
+		}
+
 		listeners = append(listeners, gwLis)
-	}
-
-	// we might have listened to /tcp/0 - let's see what we are listing on
-	gwType := "readonly"
-	if writable {
-		gwType = "writable"
-	}
-
-	for _, listener := range listeners {
-		fmt.Printf("Gateway (%s) server listening on %s\n", gwType, listener.Multiaddr())
 	}
 
 	cmdctx := *cctx
@@ -640,7 +591,7 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 
 	var opts = []corehttp.ServeOption{
 		corehttp.MetricsCollectionOption("gateway"),
-		corehttp.HostnameOption(),
+		corehttp.IPNSHostnameOption(),
 		corehttp.GatewayOption(writable, "/ipfs", "/ipns"),
 		corehttp.VersionOption(),
 		corehttp.CheckVersionOption(),
@@ -648,7 +599,7 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 	}
 
 	if cfg.Experimental.P2pHttpProxy {
-		opts = append(opts, corehttp.P2PProxyOption())
+		opts = append(opts, corehttp.ProxyOption())
 	}
 
 	if len(cfg.Gateway.RootRedirect) > 0 {
@@ -773,11 +724,7 @@ func YesNoPrompt(prompt string) bool {
 }
 
 func printVersion() {
-	v := version.CurrentVersionNumber
-	if version.CurrentCommit != "" {
-		v += "-" + version.CurrentCommit
-	}
-	fmt.Printf("go-ipfs version: %s\n", v)
+	fmt.Printf("go-ipfs version: %s-%s\n", version.CurrentVersionNumber, version.CurrentCommit)
 	fmt.Printf("Repo version: %d\n", fsrepo.RepoVersion)
 	fmt.Printf("System version: %s\n", runtime.GOARCH+"/"+runtime.GOOS)
 	fmt.Printf("Golang version: %s\n", runtime.Version())
