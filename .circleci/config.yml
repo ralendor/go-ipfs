@@ -165,6 +165,11 @@ jobs:
       - *store_gomod
   interop:
     executor: node
+<<<<<<< HEAD
+=======
+    environment:
+      IPFS_GO_EXEC: /tmp/circleci-workspace/bin/ipfs
+>>>>>>> ci: parallelize interop tests
     parallelism: 4
     steps:
       - *make_out_dirs
@@ -191,14 +196,23 @@ jobs:
       - run:
           name: Installing reporting tools
           command: |
+<<<<<<< HEAD
             npm install --save-dev mocha-circleci-reporter@0.0.3
+=======
+            npm install --save-dev mocha-junit-reporter@1.23.1 mocha-multi-reporters@1.1.0
+>>>>>>> ci: parallelize interop tests
           working_directory: ~/ipfs/go-ipfs/interop
       - run:
           name: Running tests
           command: |
             mkdir -p /tmp/test-results/interop/
             export MOCHA_FILE="$(mktemp /tmp/test-results/interop/unit.XXXXXX.xml)"
+<<<<<<< HEAD
             node_modules/.bin/mocha --reporter mocha-circleci-reporter \
+=======
+            echo '{"reporterEnabled": "mocha-junit-reporter, spec"}' > mocha-conf.json
+            node_modules/.bin/mocha -R mocha-multi-reporters --reporter-options "configFile=mocha-conf.json" \
+>>>>>>> ci: parallelize interop tests
               $(sed -n -e "s|^require('\(.*\)')$|test/\1|p" test/node.js | circleci tests split)
           working_directory: ~/ipfs/go-ipfs/interop
           environment:
