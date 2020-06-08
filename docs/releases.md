@@ -5,6 +5,7 @@
 - [Release Philosophy](#release-philosophy)
 - [Release Flow](#release-flow)
 <<<<<<< HEAD
+<<<<<<< HEAD
   - [Stage 0 - Automated Testing](#stage-0---automated-testing)
   - [Stage 1 - Internal Testing](#stage-1---internal-testing)
   - [Stage 2 - Community Dev Testing](#stage-2---community-dev-testing)
@@ -17,6 +18,13 @@
   - [Stage 3 - Community Prod Testing](#stage-2--community-prod-testing)
   - [Stage 4 - Release](#stage-4--release)
 >>>>>>> docs: improvements to the release doc
+=======
+  - [Stage 0 - Automated Testing](#stage-0---automated-testing)
+  - [Stage 1 - Internal Testing](#stage-1---internal-testing)
+  - [Stage 2 - Community Dev Testing](#stage-2---community-dev-testing)
+  - [Stage 3 - Community Prod Testing](#stage-2---community-prod-testing)
+  - [Stage 4 - Release](#stage-4---release)
+>>>>>>> fix: more dashes
 - [Release Cycle](#release-cycle)
   - [Patch Releases](#patch-releases)
 - [Performing a Release](#performing-a-release)
