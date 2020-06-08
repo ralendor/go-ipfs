@@ -4,11 +4,19 @@
 
 - [Release Philosophy](#release-philosophy)
 - [Release Flow](#release-flow)
+<<<<<<< HEAD
   - [Stage 0 - Automated Testing](#stage-0---automated-testing)
   - [Stage 1 - Internal Testing](#stage-1---internal-testing)
   - [Stage 2 - Community Dev Testing](#stage-2---community-dev-testing)
   - [Stage 3 - Community Prod Testing](#stage-3---community-prod-testing)
   - [Stage 4 - Release](#stage-4---release)
+=======
+  - [Stage 0 - Automated Testing](#stage-0--automated-testing)
+  - [Stage 1 - Internal Testing](#stage-1--internal-testing)
+  - [Stage 2 - Community Dev Testing](#stage-2--community-dev-testing)
+  - [Stage 3 - Community Prod Testing](#stage-2--community-prod-testing)
+  - [Stage 4 - Release](#stage-4--release)
+>>>>>>> docs: improvements to the release doc
 - [Release Cycle](#release-cycle)
   - [Patch Releases](#patch-releases)
 - [Performing a Release](#performing-a-release)
@@ -66,8 +74,6 @@ At this stage, we consider the release to be "production ready" and will ask the
 ### Stage 4 - Release
 
 At this stage, the release is "battle hardened" and ready for wide deployment.
-
-![go-ipfs-release-process-illustration](https://user-images.githubusercontent.com/618519/62986422-653fee00-bdf0-11e9-8f61-197117b61da2.png)
 
 ## Release Cycle
 
