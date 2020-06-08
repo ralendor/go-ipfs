@@ -79,7 +79,7 @@ documented in `ipfs config profile --help`.
     enabled block-level garbage collection), you plan on storing very little data in
     your IPFS node, and disk usage is more critical than performance, consider using
     flatfs.
-  - This datastore uses up to several gigabytes of memory. 
+  - This datastore uses up to several gigabytes of memory.
 
   This profile may only be applied when first initializing the node.
 
@@ -164,27 +164,13 @@ documented in `ipfs config profile --help`.
 
 Contains information about various listener addresses to be used by this node.
 
-### `Addresses.API`
-
-Multiaddr or array of multiaddrs describing the address to serve the local HTTP
-API on.
-
-Supported Transports:
-
-* tcp/ip{4,6} - `/ipN/.../tcp/...`
-* unix - `/unix/path/to/socket`
+- `API`
+Multiaddr or array of multiaddrs describing the address to serve the local HTTP API on.
 
 Default: `/ip4/127.0.0.1/tcp/5001`
 
-### `Addresses.Gateway`
-
-Multiaddr or array of multiaddrs describing the address to serve the local
-gateway on.
-
-Supported Transports:
-
-* tcp/ip{4,6} - `/ipN/.../tcp/...`
-* unix - `/unix/path/to/socket`
+- `Gateway`
+Multiaddr or array of multiaddrs describing the address to serve the local gateway on.
 
 Default: `/ip4/127.0.0.1/tcp/8080`
 
@@ -488,7 +474,7 @@ Default: `[]`
 
 Array of paths that should be exposed on the hostname.
 
-Example: 
+Example:
 ```json
 {
   "Gateway": {
@@ -690,7 +676,7 @@ Sets the default router used by pubsub to route messages to peers. This can be o
   connected peers. This router is extremely inefficient but _very_ reliable.
 * `"gossipsub"` - [gossipsub][] is a more advanced routing algorithm that will
   build an overlay mesh from a subset of the links in the network.
-  
+
 Default: `"gossipsub"`
 
 [gossipsub]: https://github.com/libp2p/specs/tree/master/pubsub/gossipsub
@@ -806,7 +792,7 @@ public internet (e.g., it's not behind a firewall).
 To force a specific DHT mode, client or server, set `Routing.Type` to
 `dhtclient` or `dhtserver` respectively. Please do not set this to `dhtserver`
 unless you're sure your node is reachable from the public network.
-  
+
 **Example:**
 
 ```json
@@ -816,7 +802,7 @@ unless you're sure your node is reachable from the public network.
   }
 }
 ```  
-  
+
 
 ## `Swarm`
 
