@@ -298,10 +298,11 @@ var swarmAddrsLocalCmd = &cmds.Command{
 		}
 
 		var addrs []string
+		p2pProtocolName := ma.ProtocolWithCode(ma.P_P2P).Name
 		for _, addr := range maddrs {
 			saddr := addr.String()
 			if showid {
-				saddr = path.Join(saddr, "ipfs", self.ID().Pretty())
+				saddr = path.Join(saddr, p2pProtocolName, self.ID().Pretty())
 			}
 			addrs = append(addrs, saddr)
 		}
@@ -354,7 +355,7 @@ var swarmConnectCmd = &cmds.Command{
 
 The address format is an IPFS multiaddr:
 
-ipfs swarm connect /ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
+ipfs swarm connect /ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
 `,
 	},
 	Arguments: []cmds.Argument{
@@ -399,7 +400,7 @@ var swarmDisconnectCmd = &cmds.Command{
 'ipfs swarm disconnect' closes a connection to a peer address. The address
 format is an IPFS multiaddr:
 
-ipfs swarm disconnect /ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
+ipfs swarm disconnect /ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ
 
 The disconnect is not permanent; if ipfs needs to talk to that address later,
 it will reconnect.
@@ -585,8 +586,6 @@ var swarmFiltersAddCmd = &cmds.Command{
 		Tagline: "Add an address filter.",
 		ShortDescription: `
 'ipfs swarm filters add' will add an address filter to the daemons swarm.
-Filters applied this way will not persist daemon reboots, to achieve that,
-add your filters to the ipfs config file.
 `,
 	},
 	Arguments: []cmds.Argument{
@@ -649,8 +648,6 @@ var swarmFiltersRmCmd = &cmds.Command{
 		Tagline: "Remove an address filter.",
 		ShortDescription: `
 'ipfs swarm filters rm' will remove an address filter from the daemons swarm.
-Filters removed this way will not persist daemon reboots, to achieve that,
-remove your filters from the ipfs config file.
 `,
 	},
 	Arguments: []cmds.Argument{

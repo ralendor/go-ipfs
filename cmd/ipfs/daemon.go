@@ -12,32 +12,37 @@ import (
 	"sort"
 	"sync"
 
+	multierror "github.com/hashicorp/go-multierror"
+
 	version "github.com/ipfs/go-ipfs"
+	config "github.com/ipfs/go-ipfs-config"
+	cserial "github.com/ipfs/go-ipfs-config/serialize"
 	utilmain "github.com/ipfs/go-ipfs/cmd/ipfs/util"
 	oldcmds "github.com/ipfs/go-ipfs/commands"
 	"github.com/ipfs/go-ipfs/core"
 	commands "github.com/ipfs/go-ipfs/core/commands"
-	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
 	libp2p "github.com/ipfs/go-ipfs/core/node/libp2p"
 	nodeMount "github.com/ipfs/go-ipfs/fuse/node"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
 	migrate "github.com/ipfs/go-ipfs/repo/fsrepo/migrations"
+	sockets "github.com/libp2p/go-socket-activation"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/go-ipfs-cmds"
+	cmds "github.com/ipfs/go-ipfs-cmds"
 	mprome "github.com/ipfs/go-metrics-prometheus"
 	goprocess "github.com/jbenet/goprocess"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/multiformats/go-multiaddr-net"
-	"github.com/prometheus/client_golang/prometheus"
+	manet "github.com/multiformats/go-multiaddr-net"
+	prometheus "github.com/prometheus/client_golang/prometheus"
+	promauto "github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
 	adjustFDLimitKwd          = "manage-fdlimit"
 	enableGCKwd               = "enable-gc"
 	initOptionKwd             = "init"
+	initConfigOptionKwd       = "init-config"
 	initProfileOptionKwd      = "init-profile"
 	ipfsMountKwd              = "mount-ipfs"
 	ipnsMountKwd              = "mount-ipns"
@@ -154,6 +159,7 @@ Headers.
 
 	Options: []cmds.Option{
 		cmds.BoolOption(initOptionKwd, "Initialize ipfs with default settings if not already initialized"),
+		cmds.StringOption(initConfigOptionKwd, "Path to existing configuration file to be loaded during --init"),
 		cmds.StringOption(initProfileOptionKwd, "Configuration profiles to apply for --init. See ipfs init --help for more"),
 		cmds.StringOption(routingOptionKwd, "Overrides the routing option").WithDefault(routingOptionDefaultKwd),
 		cmds.BoolOption(mountKwd, "Mounts IPFS to the filesystem"),
@@ -222,23 +228,26 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// check transport encryption flag.
 	unencrypted, _ := req.Options[unencryptTransportKwd].(bool)
 	if unencrypted {
-		log.Warningf(`Running with --%s: All connections are UNENCRYPTED.
+		log.Warnf(`Running with --%s: All connections are UNENCRYPTED.
 		You will not be able to connect to regular encrypted networks.`, unencryptTransportKwd)
 	}
 
 	// first, whether user has provided the initialization flag. we may be
 	// running in an uninitialized state.
 	initialize, _ := req.Options[initOptionKwd].(bool)
-	if initialize {
+	if initialize && !fsrepo.IsInitialized(cctx.ConfigRoot) {
+		cfgLocation, _ := req.Options[initConfigOptionKwd].(string)
+		profiles, _ := req.Options[initProfileOptionKwd].(string)
+		var conf *config.Config
 
-		cfg := cctx.ConfigRoot
-		if !fsrepo.IsInitialized(cfg) {
-			profiles, _ := req.Options[initProfileOptionKwd].(string)
-
-			err := initWithDefaults(os.Stdout, cfg, profiles)
-			if err != nil {
+		if cfgLocation != "" {
+			if conf, err = cserial.Load(cfgLocation); err != nil {
 				return err
 			}
+		}
+
+		if err = doInit(os.Stdout, cctx.ConfigRoot, false, nBitsForKeypairDefault, profiles, conf); err != nil {
+			return err
 		}
 	}
 
@@ -282,11 +291,6 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 	// The node will also close the repo but there are many places we could
 	// fail before we get to that. It can't hurt to close it twice.
 	defer repo.Close()
-
-	cfg, err := cctx.GetConfig()
-	if err != nil {
-		return err
-	}
 
 	offline, _ := req.Options[offlineKwd].(bool)
 	ipnsps, _ := req.Options[enableIPNSPubSubKwd].(bool)
@@ -364,11 +368,7 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 
 	// Start "core" plugins. We want to do this *before* starting the HTTP
 	// API as the user may be relying on these plugins.
-	api, err := coreapi.NewCoreAPI(node)
-	if err != nil {
-		return err
-	}
-	err = cctx.Plugins.Start(api)
+	err = cctx.Plugins.Start(node)
 	if err != nil {
 		return err
 	}
@@ -397,25 +397,35 @@ func daemonFunc(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment
 		return err
 	}
 
-	// construct http gateway - if it is set in the config
-	var gwErrc <-chan error
-	if len(cfg.Addresses.Gateway) > 0 {
-		var err error
-		gwErrc, err = serveHTTPGateway(req, cctx)
-		if err != nil {
-			return err
-		}
+	// construct http gateway
+	gwErrc, err := serveHTTPGateway(req, cctx)
+	if err != nil {
+		return err
 	}
+
+	// Add ipfs version info to prometheus metrics
+	var ipfsInfoMetric = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ipfs_info",
+		Help: "IPFS version information.",
+	}, []string{"version", "commit"})
+
+	// Setting to 1 lets us multiply it with other stats to add the version labels
+	ipfsInfoMetric.With(prometheus.Labels{
+		"version": version.CurrentVersionNumber,
+		"commit":  version.CurrentCommit,
+	}).Set(1)
 
 	// initialize metrics collector
 	prometheus.MustRegister(&corehttp.IpfsNodeCollector{Node: node})
 
 	// The daemon is *finally* ready.
 	fmt.Printf("Daemon is ready\n")
+	notifyReady()
 
 	// Give the user some immediate feedback when they hit C-c
 	go func() {
 		<-req.Context.Done()
+		notifyStopping()
 		fmt.Println("Received interrupt signal, shutting down...")
 		fmt.Println("(Hit ctrl-c again to force-shutdown the daemon.)")
 	}()
@@ -439,6 +449,11 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		return nil, fmt.Errorf("serveHTTPApi: GetConfig() failed: %s", err)
 	}
 
+	listeners, err := sockets.TakeListeners("io.ipfs.api")
+	if err != nil {
+		return nil, fmt.Errorf("serveHTTPApi: socket activation failed: %s", err)
+	}
+
 	apiAddrs := make([]string, 0, 2)
 	apiAddr, _ := req.Options[commands.ApiOption].(string)
 	if apiAddr == "" {
@@ -447,11 +462,18 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 		apiAddrs = append(apiAddrs, apiAddr)
 	}
 
-	listeners := make([]manet.Listener, 0, len(apiAddrs))
+	listenerAddrs := make(map[string]bool, len(listeners))
+	for _, listener := range listeners {
+		listenerAddrs[string(listener.Multiaddr().Bytes())] = true
+	}
+
 	for _, addr := range apiAddrs {
 		apiMaddr, err := ma.NewMultiaddr(addr)
 		if err != nil {
 			return nil, fmt.Errorf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
+		}
+		if listenerAddrs[string(apiMaddr.Bytes())] {
+			continue
 		}
 
 		apiLis, err := manet.Listen(apiMaddr)
@@ -459,11 +481,18 @@ func serveHTTPApi(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, error
 			return nil, fmt.Errorf("serveHTTPApi: manet.Listen(%s) failed: %s", apiMaddr, err)
 		}
 
-		// we might have listened to /tcp/0 - lets see what we are listing on
-		apiMaddr = apiLis.Multiaddr()
-		fmt.Printf("API server listening on %s\n", apiMaddr)
-		fmt.Printf("WebUI: http://%s/webui\n", apiLis.Addr())
+		listenerAddrs[string(apiMaddr.Bytes())] = true
 		listeners = append(listeners, apiLis)
+	}
+
+	for _, listener := range listeners {
+		// we might have listened to /tcp/0 - lets see what we are listing on
+		fmt.Printf("API server listening on %s\n", listener.Multiaddr())
+		// Browsers require TCP.
+		switch listener.Addr().Network() {
+		case "tcp", "tcp4", "tcp6":
+			fmt.Printf("WebUI: http://%s/webui\n", listener.Addr())
+		}
 	}
 
 	// by default, we don't let you load arbitrary ipfs objects through the api,
@@ -564,28 +593,43 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 		writable = cfg.Gateway.Writable
 	}
 
+	listeners, err := sockets.TakeListeners("io.ipfs.gateway")
+	if err != nil {
+		return nil, fmt.Errorf("serveHTTPGateway: socket activation failed: %s", err)
+	}
+
+	listenerAddrs := make(map[string]bool, len(listeners))
+	for _, listener := range listeners {
+		listenerAddrs[string(listener.Multiaddr().Bytes())] = true
+	}
+
 	gatewayAddrs := cfg.Addresses.Gateway
-	listeners := make([]manet.Listener, 0, len(gatewayAddrs))
 	for _, addr := range gatewayAddrs {
 		gatewayMaddr, err := ma.NewMultiaddr(addr)
 		if err != nil {
 			return nil, fmt.Errorf("serveHTTPGateway: invalid gateway address: %q (err: %s)", addr, err)
 		}
 
+		if listenerAddrs[string(gatewayMaddr.Bytes())] {
+			continue
+		}
+
 		gwLis, err := manet.Listen(gatewayMaddr)
 		if err != nil {
 			return nil, fmt.Errorf("serveHTTPGateway: manet.Listen(%s) failed: %s", gatewayMaddr, err)
 		}
-		// we might have listened to /tcp/0 - lets see what we are listing on
-		gatewayMaddr = gwLis.Multiaddr()
-
-		if writable {
-			fmt.Printf("Gateway (writable) server listening on %s\n", gatewayMaddr)
-		} else {
-			fmt.Printf("Gateway (readonly) server listening on %s\n", gatewayMaddr)
-		}
-
+		listenerAddrs[string(gatewayMaddr.Bytes())] = true
 		listeners = append(listeners, gwLis)
+	}
+
+	// we might have listened to /tcp/0 - lets see what we are listing on
+	gwType := "readonly"
+	if writable {
+		gwType = "writable"
+	}
+
+	for _, listener := range listeners {
+		fmt.Printf("Gateway (%s) server listening on %s\n", gwType, listener.Multiaddr())
 	}
 
 	cmdctx := *cctx
@@ -593,7 +637,7 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 
 	var opts = []corehttp.ServeOption{
 		corehttp.MetricsCollectionOption("gateway"),
-		corehttp.IPNSHostnameOption(),
+		corehttp.HostnameOption(),
 		corehttp.GatewayOption(writable, "/ipfs", "/ipns"),
 		corehttp.VersionOption(),
 		corehttp.CheckVersionOption(),
@@ -601,7 +645,7 @@ func serveHTTPGateway(req *cmds.Request, cctx *oldcmds.Context) (<-chan error, e
 	}
 
 	if cfg.Experimental.P2pHttpProxy {
-		opts = append(opts, corehttp.ProxyOption())
+		opts = append(opts, corehttp.P2PProxyOption())
 	}
 
 	if len(cfg.Gateway.RootRedirect) > 0 {
@@ -726,7 +770,11 @@ func YesNoPrompt(prompt string) bool {
 }
 
 func printVersion() {
-	fmt.Printf("go-ipfs version: %s-%s\n", version.CurrentVersionNumber, version.CurrentCommit)
+	v := version.CurrentVersionNumber
+	if version.CurrentCommit != "" {
+		v += "-" + version.CurrentCommit
+	}
+	fmt.Printf("go-ipfs version: %s\n", v)
 	fmt.Printf("Repo version: %d\n", fsrepo.RepoVersion)
 	fmt.Printf("System version: %s\n", runtime.GOARCH+"/"+runtime.GOOS)
 	fmt.Printf("Golang version: %s\n", runtime.Version())

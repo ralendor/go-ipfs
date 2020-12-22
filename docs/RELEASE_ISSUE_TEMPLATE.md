@@ -8,6 +8,10 @@ We're happy to announce go-ipfs X.Y.Z, bla bla...
 
 <List of items with PRs and/or Issues to be considered for this release>
 
+# 🚢 Estimated shipping date
+
+<Date this release will ship on if everything goes to plan (week beginning...)>
+
 ## 🔦 Highlights
 
 < top highlights for this release notes >
@@ -27,19 +31,25 @@ For each RC published in each stage:
   2. Pin the resulting release.
   3. Make a PR against ipfs/distributions with the updated versions, including the new hash in the PR comment.
   4. Ask the infra team to update the DNSLink record for dist.ipfs.io to point to the new distribution.
+- cut a pre-release on [github](https://github.com/ipfs/go-ipfs/releases) and upload the result of the ipfs/distributions build in the previous step.
+- Announce the RC:
+  - [ ] On IRC/Matrix (both #ipfs and #ipfs-dev)
+  - [ ] To the _early testers_ listed in [docs/EARLY_TESTERS.md](https://github.com/ipfs/go-ipfs/tree/master/docs/EARLY_TESTERS.md).
 
 Checklist:
 
-- [ ] **Stage 1 - Internal Testing**
+- [ ] **Stage 0 - Automated Testing**
   - [ ] Feature freeze. If any "non-trivial" changes (see the footnotes of [docs/releases.md](https://github.com/ipfs/go-ipfs/tree/master/docs/releases.md) for a definition) get added to the release, uncheck all the checkboxes and return to this stage.
-  - [ ] CHANGELOG.md has been updated
-    - use [`./bin/mkreleaselog`](https://github.com/ipfs/go-ipfs/tree/master/bin/mkreleaselog) to generate a nice starter list
   - [ ] Automated Testing (already tested in CI) - Ensure that all tests are passing, this includes:
     - [ ] unit, sharness, cross-build, etc (`make test`)
     - [ ] lint (`make test_go_lint`)
     - [ ] [interop](https://github.com/ipfs/interop#test-with-a-non-yet-released-version-of-go-ipfs)
     - [ ] [go-ipfs-api](https://github.com/ipfs/go-ipfs-api)
     - [ ] [go-ipfs-http-client](https://github.com/ipfs/go-ipfs-http-client)
+    - [ ] [WebUI](https://github.com/ipfs-shipyard/ipfs-webui)
+- [ ] **Stage 1 - Internal Testing**
+  - [ ] CHANGELOG.md has been updated
+    - use [`./bin/mkreleaselog`](https://github.com/ipfs/go-ipfs/tree/master/bin/mkreleaselog) to generate a nice starter list
   - [ ] Network Testing:
     - [ ] test lab things - TBD
   - [ ] Infrastructure Testing:
@@ -48,16 +58,15 @@ Checklist:
     - [ ] Deploy new version to a subset of Preload nodes
     - [ ] Collect metrics every day. Work with the Infrastructure team to learn of any hiccup
   - [ ] IPFS Application Testing -  Run the tests of the following applications:
-    - [ ] [WebUI](https://github.com/ipfs-shipyard/ipfs-webui) - @olizilla
     - [ ] [IPFS Desktop](https://github.com/ipfs-shipyard/ipfs-desktop) - @hacdias
     - [ ] [IPFS Companion](https://github.com/ipfs-shipyard/ipfs-companion) - @lidel
     - [ ] [NPM on IPFS](https://github.com/ipfs-shipyard/npm-on-ipfs) - @achingbrain
-- [ ] **Stage 2 - Public Beta**
+- [ ] **Stage 2 - Community Dev Testing**
   - [ ] Reach out to the IPFS _early testers_ listed in [docs/EARLY_TESTERS.md](https://github.com/ipfs/go-ipfs/tree/master/docs/EARLY_TESTERS.md) for testing this release (check when no more problems have been reported). If you'd like to be added to this list, please file a PR.
   - [ ] Reach out to on IRC for beta testers.
   - [ ] Run tests available in the following repos with the latest beta (check when all tests pass):
     - [ ] [orbit-db](https://github.com/orbitdb/orbit-db)
-- [ ] **Stage 3 - Soft Release**
+- [ ] **Stage 3 - Community Prod Testing**
   - [ ] Documentation
     - [ ] Ensure that [CHANGELOG.md](https://github.com/ipfs/go-ipfs/tree/master/CHANGELOG.md) is up to date
     - [ ] Ensure that [README.md](https://github.com/ipfs/go-ipfs/tree/master/README.md)  is up to date
@@ -85,6 +94,10 @@ Checklist:
     - [ ] [Reddit](https://reddit.com/r/ipfs)
     - [ ] [discuss.ipfs.io](https://discuss.ipfs.io/c/announcements)
     - [ ] Announce it on the [IPFS Users Mailing List](https://groups.google.com/forum/#!forum/ipfs-users)
+- [ ] **Post-Release**
+  - [ ] Bump the version in `version.go` to `vX.(Y+1).0-dev`.
+  - [ ] Create an issue using this release issue template for the _next_ release.
+  - [ ] Make sure any last-minute changelog updates from the blog post make it back into the CHANGELOG.
 
 ## ❤️ Contributors
 
@@ -96,9 +109,8 @@ Would you like to contribute to the IPFS project and don't know how? Well, there
 - Join an IPFS All Hands, introduce yourself and let us know where you would like to contribute - https://github.com/ipfs/team-mgmt/#weekly-ipfs-all-hands
 - Hack with IPFS and show us what you made! The All Hands call is also the perfect venue for demos, join in and show us what you built
 - Join the discussion at [discuss.ipfs.io](https://discuss.ipfs.io/) and help users finding their answers.
-- Join the [Go Core Dev Team Weekly Sync](https://github.com/ipfs/team-mgmt/issues/650) and be part of the Sprint action!
+- Join the [🚀 IPFS Core Implementations Weekly Sync 🛰](https://github.com/ipfs/team-mgmt/issues/992) and be part of the action!
 
 ## ⁉️ Do you have questions?
 
 The best place to ask your questions about IPFS, how it works and what you can do with it is at [discuss.ipfs.io](http://discuss.ipfs.io). We are also available at the `#ipfs` channel on Freenode, which is also [accessible through our Matrix bridge](https://riot.im/app/#/room/#freenode_#ipfs:matrix.org).
-

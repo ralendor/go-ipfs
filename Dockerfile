@@ -1,5 +1,11 @@
-FROM golang:1.12-stretch
-MAINTAINER Lars Gierth <lgierth@ipfs.io>
+FROM golang:1.14-buster
+LABEL maintainer="Steven Allen <steven@stebalien.com>"
+
+# Install deps
+RUN apt-get update && apt-get install -y \
+  libssl-dev \
+  ca-certificates \
+  fuse
 
 ENV SRC_DIR /go-ipfs
 
@@ -10,16 +16,20 @@ RUN cd $SRC_DIR \
 
 COPY . $SRC_DIR
 
+# Preload an in-tree but disabled-by-default plugin by adding it to the IPFS_PLUGINS variable
+# e.g. docker build --build-arg IPFS_PLUGINS="foo bar baz"
+ARG IPFS_PLUGINS
+
 # Build the thing.
 # Also: fix getting HEAD commit hash via git rev-parse.
 RUN cd $SRC_DIR \
   && mkdir .git/objects \
-  && make build
+  && make build GOTAGS=openssl IPFS_PLUGINS=$IPFS_PLUGINS
 
 # Get su-exec, a very minimal tool for dropping privileges,
 # and tini, a very minimal init daemon for containers
 ENV SUEXEC_VERSION v0.2
-ENV TINI_VERSION v0.16.1
+ENV TINI_VERSION v0.18.0
 RUN set -x \
   && cd /tmp \
   && git clone https://github.com/ncopa/su-exec.git \
@@ -30,15 +40,9 @@ RUN set -x \
   && wget -q -O tini https://github.com/krallin/tini/releases/download/$TINI_VERSION/tini \
   && chmod +x tini
 
-# Get the TLS CA certificates, they're not provided by busybox.
-RUN apt-get update && apt-get install -y ca-certificates
-
-# Install FUSE
-RUN apt-get update && apt-get install -y fuse
-
 # Now comes the actual target image, which aims to be as small as possible.
-FROM busybox:1-glibc
-MAINTAINER Lars Gierth <lgierth@ipfs.io>
+FROM busybox:1.31.1-glibc
+LABEL maintainer="Steven Allen <steven@stebalien.com>"
 
 # Get the ipfs binary, entrypoint script, and TLS CAs from the build container.
 ENV SRC_DIR /go-ipfs
@@ -52,8 +56,15 @@ COPY --from=0 /etc/ssl/certs /etc/ssl/certs
 # Add suid bit on fusermount so it will run properly
 RUN chmod 4755 /usr/local/bin/fusermount
 
+# Fix permissions on start_ipfs (ignore the build machine's permissions)
+RUN chmod 0755 /usr/local/bin/start_ipfs
+
 # This shared lib (part of glibc) doesn't seem to be included with busybox.
-COPY --from=0 /lib/x86_64-linux-gnu/libdl-2.24.so /lib/libdl.so.2
+COPY --from=0 /lib/*-linux-gnu*/libdl.so.2 /lib/
+
+# Copy over SSL libraries.
+COPY --from=0 /usr/lib/*-linux-gnu*/libssl.so* /usr/lib/
+COPY --from=0 /usr/lib/*-linux-gnu*/libcrypto.so* /usr/lib/
 
 # Swarm TCP; should be exposed to the public
 EXPOSE 4001

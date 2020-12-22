@@ -17,14 +17,14 @@ import (
 	bservice "github.com/ipfs/go-blockservice"
 	cid "github.com/ipfs/go-cid"
 	cidenc "github.com/ipfs/go-cidutil/cidenc"
-	"github.com/ipfs/go-ipfs-cmds"
-	"github.com/ipfs/go-ipfs-exchange-offline"
+	cmds "github.com/ipfs/go-ipfs-cmds"
+	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log"
 	dag "github.com/ipfs/go-merkledag"
 	"github.com/ipfs/go-mfs"
 	ft "github.com/ipfs/go-unixfs"
-	"github.com/ipfs/interface-go-ipfs-core"
+	iface "github.com/ipfs/interface-go-ipfs-core"
 	path "github.com/ipfs/interface-go-ipfs-core/path"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -38,6 +38,22 @@ var FilesCmd = &cmds.Command{
 		ShortDescription: `
 Files is an API for manipulating IPFS objects as if they were a unix
 filesystem.
+
+The files facility interacts with MFS (Mutable File System). MFS acts as a
+single, dynamic filesystem mount. MFS has a root CID which is transparently
+updated when a change happens (and can be checked with "ipfs files stat /").
+
+All files and folders within MFS are respected and will not be cleaned up
+during garbage collections. MFS is independent from the list of pinned items
+("ipfs pin ls"). Calls to "ipfs pin add" and "ipfs pin rm" will add and remove
+pins independently of MFS. If MFS content that was
+additionally pinned is removed by calling "ipfs files rm", it will still
+remain pinned.
+
+Content added with "ipfs add" (which by default also becomes pinned), is not
+added to MFS. Any content can be put into MFS with the command "ipfs files cp
+/ipfs/<cid> /some/path/".
+
 
 NOTE:
 Most of the subcommands of 'ipfs files' accept the '--flush' flag. It defaults
@@ -379,7 +395,7 @@ type filesLsOutput struct {
 }
 
 const (
-	longOptionName     = "l"
+	longOptionName     = "long"
 	dontSortOptionName = "U"
 )
 
@@ -408,7 +424,7 @@ Examples:
 		cmds.StringArg("path", false, false, "Path to show listing for. Defaults to '/'."),
 	},
 	Options: []cmds.Option{
-		cmds.BoolOption(longOptionName, "Use long listing format."),
+		cmds.BoolOption(longOptionName, "l", "Use long listing format."),
 		cmds.BoolOption(dontSortOptionName, "Do not sort; list entries in directory order."),
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -670,14 +686,15 @@ a beginning offset to write to. The entire length of the input will be
 written.
 
 If the '--create' option is specified, the file will be created if it does not
-exist. Nonexistant intermediate directories will not be created.
+exist. Nonexistant intermediate directories will not be created unless the
+'--parents' option is specified.
 
 Newly created files will have the same CID version and hash function of the
-parent directory unless the --cid-version and --hash options are used.
+parent directory unless the '--cid-version' and '--hash' options are used.
 
 Newly created leaves will be in the legacy format (Protobuf) if the
-CID version is 0, or raw is the CID version is non-zero.  Use of the
---raw-leaves option will override this behavior.
+CID version is 0, or raw if the CID version is non-zero.  Use of the
+'--raw-leaves' option will override this behavior.
 
 If the '--flush' option is set to false, changes will not be propogated to the
 merkledag root. This can make operations much faster when doing a large number
@@ -685,7 +702,7 @@ of writes to a deeper directory structure.
 
 EXAMPLE:
 
-    echo "hello world" | ipfs files write --create /myfs/a/b/file
+    echo "hello world" | ipfs files write --create --parents /myfs/a/b/file
     echo "hello world" | ipfs files write --truncate /myfs/a/b/file
 
 WARNING:
@@ -762,7 +779,7 @@ stat' on the file or any of its ancestors.
 				if retErr == nil {
 					retErr = err
 				} else {
-					log.Error("files: error closing file mfs file descriptor", err)
+					flog.Error("files: error closing file mfs file descriptor", err)
 				}
 			}
 		}()
@@ -997,26 +1014,28 @@ Remove files or directories.
 			path = path[:len(path)-1]
 		}
 
-		dir, name := gopath.Split(path)
-		parent, err := mfs.Lookup(nd.FilesRoot, dir)
-		if err != nil {
-			return fmt.Errorf("parent lookup: %s", err)
-		}
-
-		pdir, ok := parent.(*mfs.Directory)
-		if !ok {
-			return fmt.Errorf("no such file or directory: %s", path)
-		}
-
 		// if '--force' specified, it will remove anything else,
 		// including file, directory, corrupted node, etc
 		force, _ := req.Options[forceOptionName].(bool)
+
+		dir, name := gopath.Split(path)
+
+		pdir, err := getParentDir(nd.FilesRoot, dir)
+		if err != nil {
+			if force && err == os.ErrNotExist {
+				return nil
+			}
+			return fmt.Errorf("parent lookup: %s", err)
+		}
+
 		if force {
 			err := pdir.Unlink(name)
 			if err != nil {
+				if err == os.ErrNotExist {
+					return nil
+				}
 				return err
 			}
-
 			return pdir.Flush()
 		}
 
@@ -1133,15 +1152,11 @@ func getFileHandle(r *mfs.Root, path string, create bool, builder cid.Builder) (
 
 		// if create is specified and the file doesnt exist, we create the file
 		dirname, fname := gopath.Split(path)
-		pdiri, err := mfs.Lookup(r, dirname)
+		pdir, err := getParentDir(r, dirname)
 		if err != nil {
-			flog.Error("lookupfail ", dirname)
 			return nil, err
 		}
-		pdir, ok := pdiri.(*mfs.Directory)
-		if !ok {
-			return nil, fmt.Errorf("%s was not a directory", dirname)
-		}
+
 		if builder == nil {
 			builder = pdir.GetCidBuilder()
 		}
@@ -1183,4 +1198,17 @@ func checkPath(p string) (string, error) {
 		cleaned += "/"
 	}
 	return cleaned, nil
+}
+
+func getParentDir(root *mfs.Root, dir string) (*mfs.Directory, error) {
+	parent, err := mfs.Lookup(root, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	pdir, ok := parent.(*mfs.Directory)
+	if !ok {
+		return nil, errors.New("expected *mfs.Directory, didnt get it. This is likely a race condition")
+	}
+	return pdir, nil
 }
